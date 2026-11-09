@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import "./styles.css";
 
-const API_BASE = "http://127.0.0.1:8000/api";
+const API_BASE = import.meta.env.VITE_API_BASE || (window.location.port === "5173" ? "http://127.0.0.1:8000/api" : "/api");
 
 function App() {
   const [activeTab, setActiveTab] = useState("studio");
@@ -1332,7 +1332,7 @@ function App() {
             <strong>BrandGuard</strong> · Pre-Publication Autonomous Brand Governance · Team <strong>WHO CARES?</strong>
           </div>
           <div className="footer-links">
-            <a href="http://127.0.0.1:8000/docs" target="_blank" rel="noopener noreferrer">Interactive API Docs</a>
+            <a href="/docs" target="_blank" rel="noopener noreferrer">Interactive API Docs</a>
             <span aria-hidden="true">·</span>
             <a href="https://github.com/Rhythmuppal18/BrandGuard" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
             <span aria-hidden="true">·</span>
