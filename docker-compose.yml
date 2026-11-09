@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  brandguard:
+    build: .
+    container_name: brandguard-app
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+
