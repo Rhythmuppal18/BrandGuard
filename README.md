@@ -155,8 +155,8 @@ As required by CodeTitans India 2026, we commit to three meaningful functional i
 | :--- | :--- | :--- |
 | **Peehu** (Leader, Backend Lead) | Core FastAPI architecture, SQLite database schema, review & approval state transitions, version snapshots, and cryptographic audit logging. | Backend codebase, database persistence, and API documentation. |
 | **Rhythm Uppal** (Frontend & UX Lead) | High-fidelity SaaS interface, interactive Tracked Changes Diff Engine, live Scorecard, Brand Knowledge Hub, and Accuracy Benchmark screens. | React components, CSS3 design system, and user interaction flow. |
-| **Saatvik Bardwaj** (AI Review Engine Lead) | 4-layer rule inspection engine, Approved Facts Register, expiry logic, and source citation engine ensuring 100% of findings name approved rules. | Rule engine algorithms, fact-matching logic, and test cases. |
-| **Prabashish Singh** (Testing & Delivery Lead) | 30-item validation test dataset, PyMuPDF/python-docx multi-format extractors, automated benchmark verification, and Docker packaging. | Benchmark test suite, file extractors, and Round 2 PDF submission. |
+| **Saatvik Bardhwaj** (AI Review Engine Lead) | 4-layer rule inspection engine, Approved Facts Register, expiry logic, and source citation engine ensuring 100% of findings name approved rules. | Rule engine algorithms, fact-matching logic, and test cases. |
+| **Prabhashish Singh** (Testing & Delivery Lead) | 30-item validation test dataset, PyMuPDF/python-docx multi-format extractors, automated benchmark verification, and Docker packaging. | Benchmark test suite, file extractors, and Round 2 PDF submission. |
 
 ---
 
