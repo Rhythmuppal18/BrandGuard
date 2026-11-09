@@ -459,46 +459,52 @@ function App() {
           </div>
 
           {/* Floating Navigation Dock */}
-          <nav className="floating-tabs">
+          <nav className="floating-tabs" aria-label="Main Application Navigation">
             <button
               className={`tab-pill ${activeTab === "studio" ? "active" : ""}`}
               onClick={() => setActiveTab("studio")}
+              aria-current={activeTab === "studio" ? "page" : undefined}
             >
-              <Layers size={14} /> Review Studio
+              <Layers size={14} aria-hidden="true" /> Review Studio
             </button>
             <button
               className={`tab-pill ${activeTab === "knowledge" ? "active" : ""}`}
               onClick={() => setActiveTab("knowledge")}
+              aria-current={activeTab === "knowledge" ? "page" : undefined}
             >
-              <BookOpen size={14} /> Brand Hub
+              <BookOpen size={14} aria-hidden="true" /> Brand Hub
             </button>
             <button
               className={`tab-pill ${activeTab === "audit" ? "active" : ""}`}
               onClick={() => setActiveTab("audit")}
+              aria-current={activeTab === "audit" ? "page" : undefined}
             >
-              <Activity size={14} /> Audit Trail
+              <Activity size={14} aria-hidden="true" /> Audit Trail
             </button>
             <button
               className={`tab-pill ${activeTab === "benchmark" ? "active" : ""}`}
               onClick={() => { setActiveTab("benchmark"); if (!benchmarkData) runBenchmark(); }}
+              aria-current={activeTab === "benchmark" ? "page" : undefined}
             >
-              <Award size={14} /> Benchmark (30 Cases)
+              <Award size={14} aria-hidden="true" /> Benchmark (30 Cases)
             </button>
             <button
               className={`tab-pill ${activeTab === "roadmap" ? "active" : ""}`}
               onClick={() => setActiveTab("roadmap")}
+              aria-current={activeTab === "roadmap" ? "page" : undefined}
             >
-              <Sparkles size={14} /> Round 3 Plan
+              <Sparkles size={14} aria-hidden="true" /> Round 3 Plan
             </button>
           </nav>
 
           {/* Role Pill with Pulsing LED */}
           <div className="role-floating-capsule">
-            <div className="pulse-led"></div>
+            <div className="pulse-led" aria-hidden="true"></div>
             <select
               className="role-select-native"
               value={currentRole}
               onChange={(e) => setCurrentRole(e.target.value)}
+              aria-label="Active User Role Switcher"
             >
               <option value="Creator">Content Creator</option>
               <option value="Brand Manager">Brand Manager</option>
@@ -509,27 +515,29 @@ function App() {
         </header>
 
         {/* 4-Step Sleek Stepper */}
-        <div className="stepper-dock">
+        <nav className="stepper-dock" aria-label="Governance Workflow Progress">
           <div className={`step-node ${activeStep >= 1 ? (activeStep > 1 ? "completed" : "active") : ""}`}>
             <div className="step-circle">{activeStep > 1 ? "✓" : "1"}</div>
             <span>01. Content Input</span>
           </div>
-          <div className="step-divider-line"></div>
+          <div className="step-divider-line" aria-hidden="true"></div>
           <div className={`step-node ${activeStep >= 2 ? (activeStep > 2 ? "completed" : "active") : ""}`}>
             <div className="step-circle">{activeStep > 2 ? "✓" : "2"}</div>
             <span>02. Multi-Layer Scan</span>
           </div>
-          <div className="step-divider-line"></div>
+          <div className="step-divider-line" aria-hidden="true"></div>
           <div className={`step-node ${activeStep >= 3 ? (activeStep > 3 ? "completed" : "active") : ""}`}>
             <div className="step-circle">{activeStep > 3 ? "✓" : "3"}</div>
             <span>03. Tracked Changes & Fix</span>
           </div>
-          <div className="step-divider-line"></div>
+          <div className="step-divider-line" aria-hidden="true"></div>
           <div className={`step-node ${activeStep === 4 ? "completed active" : ""}`}>
             <div className="step-circle">{activeStep === 4 ? "★" : "4"}</div>
             <span>04. Human Sign-Off & Stamped Clearance</span>
           </div>
-        </div>
+        </nav>
+
+        <main role="main" id="main-content">
 
         {/* TAB 1: REVIEW STUDIO */}
         {activeTab === "studio" && (
@@ -672,21 +680,25 @@ function App() {
 
                 <div className="grid-meta-inputs">
                   <div>
-                    <label className="meta-label">Document Title</label>
+                    <label className="meta-label" htmlFor="doc-title-input">Document Title</label>
                     <input
+                      id="doc-title-input"
                       type="text"
                       className="glass-field-input"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="Title or Campaign Name"
+                      aria-label="Document Title"
                     />
                   </div>
                   <div>
-                    <label className="meta-label">Target Channel</label>
+                    <label className="meta-label" htmlFor="doc-channel-select">Target Channel</label>
                     <select
+                      id="doc-channel-select"
                       className="glass-field-select"
                       value={contentType}
                       onChange={(e) => setContentType(e.target.value)}
+                      aria-label="Target Channel"
                     >
                       <option value="social_post">Social Media</option>
                       <option value="press_release">Press Release</option>
@@ -699,7 +711,7 @@ function App() {
 
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-                    <label className="meta-label" style={{ margin: 0 }}>
+                    <label className="meta-label" htmlFor="doc-content-textarea" style={{ margin: 0 }}>
                       {editorMode === "editor" ? "Content Draft (Type or Paste)" : "Interactive Policy Inspector View"}
                     </label>
                     {reviewResult?.findings?.length > 0 && editorMode === "editor" && (
@@ -714,11 +726,13 @@ function App() {
 
                   {editorMode === "editor" ? (
                     <textarea
+                      id="doc-content-textarea"
                       className="glass-field-textarea"
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
                       placeholder="Enter or paste copy to verify against brand rules, tone guidelines, and verified facts..."
                       rows={8}
+                      aria-label="Content Draft Editor"
                     />
                   ) : (
                     renderInteractiveInspector()
@@ -726,14 +740,15 @@ function App() {
                 </div>
 
                 {/* Hologram File Upload Dropzone */}
-                <label className="hologram-file-dropzone">
+                <label className="hologram-file-dropzone" aria-label="Upload document file (.docx, .pdf, .txt, .md)">
                   <input
                     type="file"
                     style={{ display: "none" }}
                     accept=".pdf,.docx,.txt,.md"
                     onChange={handleFileUpload}
+                    aria-label="File input for document upload"
                   />
-                  <Upload size={18} color="var(--cyan)" />
+                  <Upload size={18} color="var(--cyan)" aria-hidden="true" />
                   <span>Drop Word (.docx) or PDF document to auto-extract and review</span>
                 </label>
 
@@ -741,8 +756,9 @@ function App() {
                   className="btn-vfx-scan"
                   onClick={runReview}
                   disabled={busy || !content.trim()}
+                  aria-label="Scan and Protect Content against brand rules"
                 >
-                  {busy ? <RefreshCw className="spin" size={17} /> : <Wand2 size={17} />}
+                  {busy ? <RefreshCw className="spin" size={17} aria-hidden="true" /> : <Wand2 size={17} aria-hidden="true" />}
                   {busy ? "Running 4-Layer Guideline Verification..." : "✨ Scan & Protect Content →"}
                 </button>
               </div>
@@ -1082,11 +1098,11 @@ function App() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
+            <div className="responsive-grid-2col">
               {/* Facts Register */}
               <div className="floating-glass-panel">
                 <div className="panel-header-clean">
-                  <h2><BookOpen size={16} color="var(--cyan)" /> Approved Facts Register</h2>
+                  <h2><BookOpen size={16} color="var(--cyan)" aria-hidden="true" /> Approved Facts Register</h2>
                   <span className="badge-neon approved">{brandKit.approved_facts.length} Verified</span>
                 </div>
                 <div style={{ maxHeight: 480, overflowY: "auto" }}>
@@ -1110,7 +1126,7 @@ function App() {
               {/* Banned Vocabulary */}
               <div className="floating-glass-panel">
                 <div className="panel-header-clean">
-                  <h2><AlertTriangle size={16} color="var(--rose)" /> Prohibited Vocabulary</h2>
+                  <h2><AlertTriangle size={16} color="var(--rose)" aria-hidden="true" /> Prohibited Vocabulary</h2>
                   <span className="badge-neon changes-requested">{brandKit.banned_terms.length} Terms</span>
                 </div>
                 <div style={{ maxHeight: 480, overflowY: "auto" }}>
@@ -1134,7 +1150,7 @@ function App() {
         {activeTab === "audit" && (
           <div className="floating-glass-panel">
             <div className="panel-header-clean">
-              <h2><Activity size={16} color="var(--purple)" /> Immutable Governance Audit Trail</h2>
+              <h2><Activity size={16} color="var(--purple)" aria-hidden="true" /> Immutable Governance Audit Trail</h2>
               <span className="badge-neon approved">Cryptographically Logged</span>
             </div>
 
@@ -1143,15 +1159,15 @@ function App() {
                 Run an inspection in the Review Studio to view real-time audit trail logs.
               </p>
             ) : (
-              <div style={{ overflowX: "auto" }}>
+              <div className="table-responsive" role="region" aria-label="Governance Audit Trail">
                 <table className="vfx-table">
                   <thead>
                     <tr>
-                      <th>Timestamp</th>
-                      <th>Actor & Role</th>
-                      <th>Event Action</th>
-                      <th>Details</th>
-                      <th>SHA-256 Hash</th>
+                      <th scope="col">Timestamp</th>
+                      <th scope="col">Actor & Role</th>
+                      <th scope="col">Event Action</th>
+                      <th scope="col">Details</th>
+                      <th scope="col">SHA-256 Hash</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1199,7 +1215,7 @@ function App() {
 
             {benchmarkData && (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.75rem", marginBottom: "1rem" }}>
+                <div className="benchmark-stats-strip">
                   <div style={{ background: "rgba(13,20,38,0.7)", border: "1px solid var(--border-glass)", borderRadius: 10, padding: "0.75rem", textAlign: "center" }}>
                     <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Total Tests</div>
                     <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#fff" }}>{benchmarkData.summary.total_tests}</div>
@@ -1226,17 +1242,17 @@ function App() {
                 </div>
 
                 <div className="floating-glass-panel">
-                  <div style={{ overflowX: "auto" }}>
+                  <div className="table-responsive" role="region" aria-label="Benchmark Test Cases">
                     <table className="vfx-table">
                       <thead>
                         <tr>
-                          <th>Test ID</th>
-                          <th>Scenario Name</th>
-                          <th>Text Under Test</th>
-                          <th>Expected</th>
-                          <th>Detected</th>
-                          <th>Latency</th>
-                          <th>Status</th>
+                          <th scope="col">Test ID</th>
+                          <th scope="col">Scenario Name</th>
+                          <th scope="col">Text Under Test</th>
+                          <th scope="col">Expected</th>
+                          <th scope="col">Detected</th>
+                          <th scope="col">Latency</th>
+                          <th scope="col">Status</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1308,49 +1324,70 @@ function App() {
             </div>
           </div>
         )}
+        </main>
+
+        {/* Semantic Accessible Footer */}
+        <footer role="contentinfo" className="brandguard-footer">
+          <div>
+            <strong>BrandGuard</strong> · Pre-Publication Autonomous Brand Governance · Team <strong>WHO CARES?</strong>
+          </div>
+          <div className="footer-links">
+            <a href="http://127.0.0.1:8000/docs" target="_blank" rel="noopener noreferrer">Interactive API Docs</a>
+            <span aria-hidden="true">·</span>
+            <a href="https://github.com/Rhythmuppal18/BrandGuard" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
+            <span aria-hidden="true">·</span>
+            <span>CodeTitans India 2026</span>
+          </div>
+        </footer>
       </div>
 
       {/* Modal: Add Banned Term */}
       {newTermModal && (
-        <div className="modal-overlay-custom">
+        <div className="modal-overlay-custom" role="dialog" aria-modal="true" aria-labelledby="modal-term-title">
           <div className="modal-dialog-custom">
-            <h3 style={{ color: "#fff", fontSize: "1.1rem", fontWeight: 700 }}>Add Prohibited Term to Brand Rules</h3>
+            <h3 id="modal-term-title" style={{ color: "#fff", fontSize: "1.1rem", fontWeight: 700 }}>Add Prohibited Term to Brand Rules</h3>
             <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
               The rule engine will automatically enforce this term with case-adaptive replacement.
             </p>
             <div>
-              <label className="meta-label">Prohibited Term or Phrase</label>
+              <label className="meta-label" htmlFor="modal-term-input">Prohibited Term or Phrase</label>
               <input
+                id="modal-term-input"
                 type="text"
                 className="glass-field-input"
                 placeholder="e.g. cheap, free money, crypto"
                 value={newTermForm.term}
                 onChange={(e) => setNewTermForm({ ...newTermForm, term: e.target.value })}
+                aria-label="Prohibited Term or Phrase"
               />
             </div>
             <div>
-              <label className="meta-label">Approved Replacement</label>
+              <label className="meta-label" htmlFor="modal-term-replace">Approved Replacement</label>
               <input
+                id="modal-term-replace"
                 type="text"
                 className="glass-field-input"
                 placeholder="e.g. cost-effective, digital asset"
                 value={newTermForm.suggested_replacement}
                 onChange={(e) => setNewTermForm({ ...newTermForm, suggested_replacement: e.target.value })}
+                aria-label="Approved Replacement"
               />
             </div>
             <div>
-              <label className="meta-label">Policy Rationale</label>
+              <label className="meta-label" htmlFor="modal-term-reason">Policy Rationale</label>
               <input
+                id="modal-term-reason"
                 type="text"
                 className="glass-field-input"
                 placeholder="e.g. Diminishes brand enterprise positioning."
                 value={newTermForm.reason}
                 onChange={(e) => setNewTermForm({ ...newTermForm, reason: e.target.value })}
+                aria-label="Policy Rationale"
               />
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
-              <button className="btn-subtle-trans" onClick={() => setNewTermModal(false)}>Cancel</button>
-              <button className="btn-stamped-approve" onClick={handleAddTerm}>Save Prohibited Term</button>
+              <button className="btn-subtle-trans" onClick={() => setNewTermModal(false)} aria-label="Cancel adding term">Cancel</button>
+              <button className="btn-stamped-approve" onClick={handleAddTerm} aria-label="Save Prohibited Term">Save Prohibited Term</button>
             </div>
           </div>
         </div>
@@ -1358,45 +1395,51 @@ function App() {
 
       {/* Modal: Add Approved Fact */}
       {newFactModal && (
-        <div className="modal-overlay-custom">
+        <div className="modal-overlay-custom" role="dialog" aria-modal="true" aria-labelledby="modal-fact-title">
           <div className="modal-dialog-custom">
-            <h3 style={{ color: "#fff", fontSize: "1.1rem", fontWeight: 700 }}>Add Verified Brand Fact</h3>
+            <h3 id="modal-fact-title" style={{ color: "#fff", fontSize: "1.1rem", fontWeight: 700 }}>Add Verified Brand Fact</h3>
             <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
               Add a factual proposition to the approved knowledge base for claim corroboration.
             </p>
             <div>
-              <label className="meta-label">Claim Identifier / Topic</label>
+              <label className="meta-label" htmlFor="modal-fact-key">Claim Identifier / Topic</label>
               <input
+                id="modal-fact-key"
                 type="text"
                 className="glass-field-input"
                 placeholder="e.g. market_rank_2026, uptime_sla"
                 value={newFactForm.claim_key}
                 onChange={(e) => setNewFactForm({ ...newFactForm, claim_key: e.target.value })}
+                aria-label="Claim Identifier"
               />
             </div>
             <div>
-              <label className="meta-label">Approved Factual Statement</label>
+              <label className="meta-label" htmlFor="modal-fact-statement">Approved Factual Statement</label>
               <textarea
+                id="modal-fact-statement"
                 className="glass-field-textarea"
                 style={{ minHeight: 70 }}
                 placeholder="e.g. ApexPay guarantees 99.99% multi-region uptime."
                 value={newFactForm.statement}
                 onChange={(e) => setNewFactForm({ ...newFactForm, statement: e.target.value })}
+                aria-label="Approved Factual Statement"
               />
             </div>
             <div>
-              <label className="meta-label">Verification Source Document</label>
+              <label className="meta-label" htmlFor="modal-fact-source">Verification Source Document</label>
               <input
+                id="modal-fact-source"
                 type="text"
                 className="glass-field-input"
                 placeholder="e.g. SOC2 Type II Report 2026, Section 4.2"
                 value={newFactForm.source_document}
                 onChange={(e) => setNewFactForm({ ...newFactForm, source_document: e.target.value })}
+                aria-label="Verification Source Document"
               />
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
-              <button className="btn-subtle-trans" onClick={() => setNewFactModal(false)}>Cancel</button>
-              <button className="btn-stamped-approve" onClick={handleAddFact}>Register Approved Fact</button>
+              <button className="btn-subtle-trans" onClick={() => setNewFactModal(false)} aria-label="Cancel adding fact">Cancel</button>
+              <button className="btn-stamped-approve" onClick={handleAddFact} aria-label="Register Approved Fact">Register Approved Fact</button>
             </div>
           </div>
         </div>
@@ -1404,9 +1447,9 @@ function App() {
 
       {/* Dismissal Modal */}
       {rejectionModal && (
-        <div className="modal-overlay-custom">
+        <div className="modal-overlay-custom" role="dialog" aria-modal="true" aria-labelledby="modal-dismiss-title">
           <div className="modal-dialog-custom">
-            <h3 style={{ marginBottom: "0.35rem", color: "#fff", fontSize: "1rem" }}>Dismiss Suggestion</h3>
+            <h3 id="modal-dismiss-title" style={{ marginBottom: "0.35rem", color: "#fff", fontSize: "1rem" }}>Dismiss Suggestion</h3>
             <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: "0.85rem" }}>
               Dismissing a rule flag for “{rejectionModal.originalText}” requires a brief reason. This helps BrandGuard detect ambiguous or outdated guidelines.
             </p>
@@ -1416,12 +1459,14 @@ function App() {
               placeholder="E.g., Legal exception granted for this partner announcement..."
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
+              aria-label="Reason for dismissing rule suggestion"
             />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
               <button
                 className="btn-subtle-trans"
                 style={{ padding: "0.35rem 0.85rem", fontSize: "0.78rem" }}
                 onClick={() => setRejectionModal(null)}
+                aria-label="Cancel dismissal"
               >
                 Cancel
               </button>
@@ -1431,6 +1476,7 @@ function App() {
                   handleSuggestion(rejectionModal.changeId, "reject", rejectionReason || "Creator dismissed");
                   setRejectionModal(null);
                 }}
+                aria-label="Confirm dismissal"
               >
                 Confirm Dismissal
               </button>

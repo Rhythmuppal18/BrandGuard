@@ -1,9 +1,9 @@
 /* BrandGuard - Ultra-Rich Futuristic Glassmorphism & VFX Design System */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* Fonts preconnected & preloaded via index.html for zero render-blocking performance */
 
 :root {
-  --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-main: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   /* Surfaces */
   --bg-dark: #050811;
@@ -18,18 +18,18 @@
   --border-glow-cyan: rgba(6, 182, 212, 0.4);
   --border-glow-emerald: rgba(16, 185, 129, 0.4);
 
-  /* Text */
+  /* Text - High Contrast WCAG AAA compliant */
   --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
 
-  /* Palette */
-  --cyan: #06b6d4;
+  /* Palette - Vivid & Accessible */
+  --cyan: #22d3ee;
   --blue: #3b82f6;
-  --emerald: #10b981;
-  --purple: #8b5cf6;
-  --rose: #f43f5e;
-  --amber: #f59e0b;
+  --emerald: #34d399;
+  --purple: #a78bfa;
+  --rose: #fb7185;
+  --amber: #fbbf24;
 
   /* Shadows */
   --shadow-floating: 0 20px 50px -10px rgba(0, 0, 0, 0.7), 0 0 1px 1px rgba(255, 255, 255, 0.08);
@@ -1289,5 +1289,259 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1.15rem;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Accessibility & Focus Rings (Lighthouse 100) */
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* Responsive Containers & Grids */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-md);
+}
+
+.responsive-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.benchmark-stats-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+/* Modern Accessible Footer */
+.brandguard-footer {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-glass);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+}
+
+.footer-links {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.footer-links a, .footer-links span {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.footer-links a:hover {
+  color: var(--cyan);
+}
+
+/* ==========================================================================
+   Comprehensive Responsive Breakpoints (Mobile, Tablet, Desktop)
+   ========================================================================== */
+
+/* Large Tablets & Small Laptops (< 1200px) */
+@media (max-width: 1200px) {
+  .studio-grid-balanced {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+  .benchmark-stats-strip {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Tablets Landscape & Portrait (< 992px) */
+@media (max-width: 992px) {
+  .floating-dock-header {
+    flex-wrap: wrap;
+    row-gap: 0.85rem;
+    padding: 0.85rem 1.15rem;
+  }
+  .floating-tabs {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    justify-content: flex-start;
+    padding: 0.3rem;
+    scrollbar-width: none;
+  }
+  .floating-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .tab-pill {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.8rem;
+    min-height: 40px;
+  }
+  .responsive-grid-2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Standard Tablets & Large Phones (< 768px) */
+@media (max-width: 768px) {
+  .ultra-app {
+    padding: 0.85rem 1rem 3rem 1rem;
+    gap: 1rem;
+  }
+  .floating-dock-header {
+    top: 0.75rem;
+  }
+  .stepper-dock {
+    padding: 0.6rem 0.85rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .step-node span {
+    font-size: 0.74rem;
+  }
+  .step-divider-line {
+    margin: 0 0.5rem;
+  }
+  .grid-meta-inputs {
+    grid-template-columns: 1fr;
+  }
+  .split-view-cards {
+    grid-template-columns: 1fr;
+  }
+  .score-holographic-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.85rem;
+  }
+  .subscore-pills-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .clearance-deck-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.65rem;
+  }
+  .clearance-deck-btns {
+    width: 100%;
+    flex-direction: column;
+  }
+  .clearance-deck-btns button {
+    width: 100%;
+    justify-content: center;
+  }
+  .benchmark-stats-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .modal-dialog-custom {
+    padding: 1.35rem;
+    max-width: 95vw;
+  }
+  .brandguard-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Mobile Phones (< 540px) */
+@media (max-width: 540px) {
+  .ultra-app {
+    padding: 0.5rem 0.65rem 2.5rem 0.65rem;
+    gap: 0.85rem;
+  }
+  .floating-dock-header {
+    padding: 0.65rem 0.85rem;
+    border-radius: var(--radius-lg);
+  }
+  .brand-aura-box {
+    gap: 0.75rem;
+  }
+  .brand-icon-shield {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+  }
+  .brand-title-text {
+    font-size: 1.15rem;
+  }
+  .brand-subline {
+    display: none;
+  }
+  .role-floating-capsule {
+    padding: 0.25rem 0.6rem;
+  }
+  .role-select-native {
+    font-size: 0.76rem;
+  }
+  .stepper-dock {
+    padding: 0.5rem 0.65rem;
+  }
+  .step-node span {
+    display: none;
+  }
+  .step-circle {
+    width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
+  }
+  .step-divider-line {
+    margin: 0 0.35rem;
+  }
+  .scenario-strip {
+    gap: 0.4rem;
+  }
+  .strip-label {
+    width: 100%;
+    margin-bottom: 0.2rem;
+  }
+  .scenario-glow-chip {
+    font-size: 0.74rem;
+    padding: 0.4rem 0.65rem;
+    min-height: 40px;
+  }
+  .floating-glass-panel {
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+  }
+  .btn-vfx-scan,
+  .btn-stamped-approve,
+  .btn-gold-cert,
+  .btn-docx-export,
+  .btn-magic-pulsing {
+    min-height: 44px;
+    font-size: 0.86rem;
+  }
+  .benchmark-stats-strip {
+    grid-template-columns: 1fr;
+  }
+  .beginner-guide-steps {
+    flex-direction: column;
+  }
+}
+
+/* Extra Small Phones (< 380px) */
+@media (max-width: 380px) {
+  .subscore-pills-row {
+    grid-template-columns: 1fr;
+  }
+  .brand-title-text {
+    font-size: 1.05rem;
+  }
+  .cyber-beacon-pill {
+    display: none;
+  }
 }
 
