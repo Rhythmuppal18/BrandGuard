@@ -15,8 +15,8 @@ init_db()
 
 app = FastAPI(
     title="BrandGuard API - Intelligent Pre-Publication Brand Governance",
-    version="2.0.0",
-    description="CodeTitans India 2026 Round 2 Build. Automated brand rules, citations, tracked changes diff, and human-in-the-loop signoff."
+    version="3.0.0",
+    description="CodeTitans India 2026 Round 3 Final Build. Multimodal Visual Engine, Enterprise Privacy Shield, and Continuous Self-Healing Governance."
 )
 
 # GZip compression for ultra-fast transfers (Lighthouse Performance 95+)

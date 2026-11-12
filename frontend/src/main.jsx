@@ -4,8 +4,9 @@ import confetti from "canvas-confetti";
 import {
   ShieldCheck, AlertTriangle, CheckCircle2, FileText, Upload, RefreshCw,
   Check, X, Award, BookOpen, Activity, Sparkles, Layers, Wand2, Download,
-  Sliders, SplitSquareVertical, FileCheck, ArrowRight, UserCheck, Eye,
-  Edit3, HelpCircle, Plus, RotateCcw, Info
+  Sliders, SplitSquareVertical, FileCheck, ArrowRight, UserCheck, Eye, EyeOff,
+  Edit3, HelpCircle, Plus, RotateCcw, Info, Lock, Unlock, Zap, ShieldAlert,
+  Scale, Key, History, AlertOctagon, CheckSquare
 } from "lucide-react";
 import "./styles.css";
 
@@ -31,6 +32,37 @@ function App() {
   const [rejectionModal, setRejectionModal] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
 
+  // Pillar 1: Multimodal Visual Engine state
+  const [visualSamples, setVisualSamples] = useState([]);
+  const [selectedVisualSample, setSelectedVisualSample] = useState(null);
+  const [visualAssetType, setVisualAssetType] = useState("banner");
+  const [visualAnalysis, setVisualAnalysis] = useState(null);
+  const [visualBusy, setVisualBusy] = useState(false);
+  const [visualActiveSubtab, setVisualActiveSubtab] = useState("palette");
+
+  // Pillar 2: Enterprise Privacy Shield state
+  const [privacyText, setPrivacyText] = useState(
+    "Internal Board Memo: Contact CFO Dr. Sarah Jenkins at s.jenkins@apexpay.com or direct line +1 (555) 234-8901.\n" +
+    "DO NOT leak private production token sk_test_99887766554433221100aabbcc on internal Slack channels.\n" +
+    "Preliminary Q3 audit: ApexPay achieved $48.5M ARR with high-value merchant escrow account 4111-2222-3333-4444.\n" +
+    "Internal deployment cluster gateway resides at 10.0.4.12:8443."
+  );
+  const [privacyAirGapped, setPrivacyAirGapped] = useState(true);
+  const [privacyResult, setPrivacyResult] = useState(null);
+  const [privacyRestored, setPrivacyRestored] = useState(false);
+  const [privacyBusy, setPrivacyBusy] = useState(false);
+  const [disclosureLedger, setDisclosureLedger] = useState([]);
+
+  // Pillar 3: Continuous Guideline Health & Self-Healing state
+  const [governanceMetrics, setGovernanceMetrics] = useState(null);
+  const [disputeStats, setDisputeStats] = useState([]);
+  const [conflicts, setConflicts] = useState([]);
+  const [proposals, setProposals] = useState([]);
+  const [governanceBusy, setGovernanceBusy] = useState(false);
+  const [governanceTab, setGovernanceTab] = useState("conflicts");
+  const [disputeModal, setDisputeModal] = useState(null);
+  const [disputeReasonInput, setDisputeReasonInput] = useState("");
+
   // Brand Hub & Custom Management state
   const [brandKit, setBrandKit] = useState(null);
   const [newTermModal, setNewTermModal] = useState(false);
@@ -47,6 +79,9 @@ function App() {
     fetchScenarios();
     fetchBrandKit();
     fetchCommitments();
+    fetchVisualSamples();
+    fetchPrivacyLedger();
+    fetchGovernanceData();
   }, []);
 
   async function fetchScenarios() {
@@ -79,6 +114,198 @@ function App() {
       if (res.ok) setCommitments(await res.json());
     } catch (e) {
       console.warn(e);
+    }
+  }
+
+  // --- PILLAR 1: VISUAL ENGINE HANDLERS ---
+  async function fetchVisualSamples() {
+    try {
+      const res = await fetch(`${API_BASE}/visual/samples`);
+      if (res.ok) {
+        const data = await res.json();
+        setVisualSamples(data.samples || []);
+        if (data.samples && data.samples.length > 0 && !visualAnalysis) {
+          inspectVisualAsset(data.samples[0].image_data, data.samples[0].title, "banner");
+          setSelectedVisualSample(data.samples[0].id);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function inspectVisualAsset(imageBase64, filename, assetType) {
+    setVisualBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/visual/inspect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image_base64: imageBase64,
+          filename: filename || "asset.png",
+          asset_type: assetType || visualAssetType
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setVisualAnalysis(data);
+        if (data.overall_visual_score >= 85) triggerConfetti();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setVisualBusy(false);
+    }
+  }
+
+  function handleCustomImageUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const b64 = reader.result;
+      setSelectedVisualSample("custom");
+      inspectVisualAsset(b64, file.name, visualAssetType);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // --- PILLAR 2: PRIVACY SHIELD HANDLERS ---
+  async function runPrivacyScan(textToScan, airGapped) {
+    if (!textToScan) return;
+    setPrivacyBusy(true);
+    setPrivacyRestored(false);
+    try {
+      const res = await fetch(`${API_BASE}/privacy/scan-redact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: textToScan,
+          air_gapped_mode: airGapped !== undefined ? airGapped : privacyAirGapped
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPrivacyResult(data.scan_result);
+        fetchPrivacyLedger();
+        if (data.scan_result.total_redactions > 0) triggerConfetti();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setPrivacyBusy(false);
+    }
+  }
+
+  async function restorePrivacyText() {
+    if (!privacyResult) return;
+    if (privacyRestored) {
+      setPrivacyRestored(false);
+      return;
+    }
+    setPrivacyBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/privacy/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scan_id: privacyResult.scan_id,
+          redacted_text: privacyResult.redacted_text
+        })
+      });
+      if (res.ok) {
+        setPrivacyRestored(true);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setPrivacyBusy(false);
+    }
+  }
+
+  async function fetchPrivacyLedger() {
+    try {
+      const res = await fetch(`${API_BASE}/privacy/ledger?limit=25`);
+      if (res.ok) {
+        const data = await res.json();
+        setDisclosureLedger(data.ledger || []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // --- PILLAR 3: GUIDELINE HEALTH & GOVERNANCE HANDLERS ---
+  async function fetchGovernanceData() {
+    setGovernanceBusy(true);
+    try {
+      const [mRes, dRes, cRes, pRes] = await Promise.all([
+        fetch(`${API_BASE}/governance/health-metrics`),
+        fetch(`${API_BASE}/governance/disputes`),
+        fetch(`${API_BASE}/governance/conflicts`),
+        fetch(`${API_BASE}/governance/proposals`)
+      ]);
+      if (mRes.ok) setGovernanceMetrics(await mRes.json());
+      if (dRes.ok) setDisputeStats((await dRes.json()).dispute_analytics || []);
+      if (cRes.ok) setConflicts((await cRes.json()).conflicts || []);
+      if (pRes.ok) setProposals((await pRes.json()).proposals || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setGovernanceBusy(false);
+    }
+  }
+
+  async function handleApplyClarification(proposalId) {
+    try {
+      const res = await fetch(`${API_BASE}/governance/proposals/${proposalId}/apply?admin_user=${encodeURIComponent(currentRole)}`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        fetchGovernanceData();
+        triggerConfetti();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function handleRollbackClarification(proposalId) {
+    try {
+      const res = await fetch(`${API_BASE}/governance/proposals/${proposalId}/rollback?admin_user=${encodeURIComponent(currentRole)}`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        fetchGovernanceData();
+        triggerConfetti();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function handleSubmitDispute() {
+    if (!disputeModal || !disputeReasonInput.trim()) return;
+    try {
+      const res = await fetch(`${API_BASE}/governance/dispute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rule_id: disputeModal.rule_id,
+          rule_name: disputeModal.rule_name,
+          category: disputeModal.category || "General",
+          reason: disputeReasonInput.trim(),
+          user_role: currentRole
+        })
+      });
+      if (res.ok) {
+        setDisputeModal(null);
+        setDisputeReasonInput("");
+        fetchGovernanceData();
+        triggerConfetti();
+      }
+    } catch (e) {
+      console.error(e);
     }
   }
 
@@ -436,8 +663,8 @@ function App() {
           <div className="brand-aura-box">
             <div className="brand-emblem-wrap">
               <div className="brand-emblem-halo"></div>
-              <div className="brand-icon-shield">
-                <ShieldCheck size={26} className="shield-svg" />
+              <div className="brand-icon-shield" title="BrandGuard Autonomous Multi-Modal Governance">
+                <ShieldCheck size={28} className="shield-svg" />
               </div>
             </div>
             <div className="brand-heading">
@@ -445,13 +672,13 @@ function App() {
                 <h1 className="brand-title-text">
                   Brand<span className="brand-accent-text">Guard</span>
                 </h1>
-                <span className="cyber-beacon-pill">
-                  <span className="beacon-core"></span>
-                  ROUND 2 BUILD
+                <span className="cyber-beacon-pill round3-badge">
+                  <span className="beacon-core pulse-beacon"></span>
+                  ROUND 3 FINAL · ENTERPRISE
                 </span>
               </div>
               <div className="brand-subline">
-                <span className="brand-subline-main">Autonomous Brand Governance Platform</span>
+                <span className="brand-subline-main">Pre-Publication Multi-Modal Brand Governance</span>
                 <span className="brand-subline-dot">·</span>
                 <span className="brand-subline-team">Team WHO CARES?</span>
               </div>
@@ -468,6 +695,27 @@ function App() {
               <Layers size={14} aria-hidden="true" /> Review Studio
             </button>
             <button
+              className={`tab-pill ${activeTab === "visual" ? "active" : ""}`}
+              onClick={() => { setActiveTab("visual"); if (visualSamples.length === 0) fetchVisualSamples(); }}
+              aria-current={activeTab === "visual" ? "page" : undefined}
+            >
+              <Sliders size={14} aria-hidden="true" /> Multimodal Visual
+            </button>
+            <button
+              className={`tab-pill ${activeTab === "privacy" ? "active" : ""}`}
+              onClick={() => { setActiveTab("privacy"); if (!privacyResult) runPrivacyScan(privacyText, privacyAirGapped); }}
+              aria-current={activeTab === "privacy" ? "page" : undefined}
+            >
+              <Lock size={14} aria-hidden="true" /> Privacy Shield
+            </button>
+            <button
+              className={`tab-pill ${activeTab === "governance" ? "active" : ""}`}
+              onClick={() => { setActiveTab("governance"); fetchGovernanceData(); }}
+              aria-current={activeTab === "governance" ? "page" : undefined}
+            >
+              <Zap size={14} aria-hidden="true" /> Guideline Health
+            </button>
+            <button
               className={`tab-pill ${activeTab === "knowledge" ? "active" : ""}`}
               onClick={() => setActiveTab("knowledge")}
               aria-current={activeTab === "knowledge" ? "page" : undefined}
@@ -476,10 +724,10 @@ function App() {
             </button>
             <button
               className={`tab-pill ${activeTab === "audit" ? "active" : ""}`}
-              onClick={() => setActiveTab("audit")}
+              onClick={() => { setActiveTab("audit"); fetchPrivacyLedger(); }}
               aria-current={activeTab === "audit" ? "page" : undefined}
             >
-              <Activity size={14} aria-hidden="true" /> Audit Trail
+              <Activity size={14} aria-hidden="true" /> Audit & Ledger
             </button>
             <button
               className={`tab-pill ${activeTab === "benchmark" ? "active" : ""}`}
@@ -487,13 +735,6 @@ function App() {
               aria-current={activeTab === "benchmark" ? "page" : undefined}
             >
               <Award size={14} aria-hidden="true" /> Benchmark (30 Cases)
-            </button>
-            <button
-              className={`tab-pill ${activeTab === "roadmap" ? "active" : ""}`}
-              onClick={() => setActiveTab("roadmap")}
-              aria-current={activeTab === "roadmap" ? "page" : undefined}
-            >
-              <Sparkles size={14} aria-hidden="true" /> Round 3 Plan
             </button>
           </nav>
 
@@ -1061,6 +1302,742 @@ function App() {
             </div>
           </>
         )}
+
+        {/* ================================================================= */}
+        {/* PILLAR 1: MULTIMODAL VISUAL & ACCESSIBILITY COMPLIANCE ENGINE    */}
+        {/* ================================================================= */}
+        {activeTab === "visual" && (
+          <div className="visual-container">
+            <div className="r3-hero-ribbon">
+              <div className="r3-hero-left">
+                <h2><Sliders size={20} color="var(--cyan)" /> Multimodal Visual & Accessibility Compliance Engine</h2>
+                <p>
+                  Mathematical CIEDE2000 (ΔE₀₀) color deviation against official brand palette,
+                  WCAG 2.1 AA/AAA contrast matrix, and logo aspect-ratio & margin clearance verification.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                <label className="btn-vfx-scan" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, margin: 0, padding: "0.55rem 1rem", fontSize: "0.82rem" }}>
+                  <Upload size={14} /> Upload Custom Asset
+                  <input type="file" accept="image/*" onChange={handleCustomImageUpload} style={{ display: "none" }} />
+                </label>
+              </div>
+            </div>
+
+            {/* 1-Click Preset Visual Assets */}
+            <div className="r3-preset-strip">
+              <span className="strip-label"><Sparkles size={13} color="var(--cyan)" /> 1-Click Evaluator Assets:</span>
+              {visualSamples.map((sample) => (
+                <button
+                  key={sample.id}
+                  className={`r3-preset-btn ${selectedVisualSample === sample.id ? "active" : ""}`}
+                  onClick={() => {
+                    setSelectedVisualSample(sample.id);
+                    inspectVisualAsset(sample.image_data, sample.title, sample.id.includes("logo") ? "logo" : "banner");
+                  }}
+                >
+                  <span>{sample.id.includes("compliant") ? "✨" : sample.id.includes("contrast") ? "⚠️" : "🚨"}</span>
+                  <span>{sample.title}</span>
+                  <small style={{ opacity: 0.7, fontSize: "0.7rem" }}>({sample.expected_score})</small>
+                </button>
+              ))}
+            </div>
+
+            {/* Main Visual Workspace Grid */}
+            {visualAnalysis ? (
+              <div className="visual-workspace-grid">
+                {/* Left Column: Asset Preview & Score Pod */}
+                <div className="visual-preview-card">
+                  <div className="panel-header-clean" style={{ padding: 0 }}>
+                    <div>
+                      <h3 style={{ fontSize: "1rem", color: "#fff", fontWeight: 700 }}>Asset Rendering & Inspection</h3>
+                      <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                        {visualAnalysis.filename} · {visualAnalysis.dimensions.width} × {visualAnalysis.dimensions.height} px ({visualAnalysis.format})
+                      </p>
+                    </div>
+                    <span className={`badge-neon ${visualAnalysis.clearance_status === "APPROVED_VISUAL" ? "approved" : visualAnalysis.clearance_status === "WARNING_REMEDIATION_RECOMMENDED" ? "in-review" : "changes-requested"}`}>
+                      {visualAnalysis.clearance_status}
+                    </span>
+                  </div>
+
+                  <div className="visual-asset-stage">
+                    {visualSamples.find(s => s.id === selectedVisualSample)?.image_data ? (
+                      <img
+                        src={visualSamples.find(s => s.id === selectedVisualSample).image_data}
+                        alt="Analyzed Asset Preview"
+                        className="visual-asset-img"
+                      />
+                    ) : (
+                      <div style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>Custom Asset Loaded</div>
+                    )}
+                  </div>
+
+                  <div className="visual-score-pod">
+                    <div>
+                      <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Overall Visual Score</div>
+                      <div className="visual-score-big" style={{ color: visualAnalysis.overall_visual_score >= 85 ? "var(--emerald)" : visualAnalysis.overall_visual_score >= 60 ? "var(--amber)" : "var(--rose)" }}>
+                        {visualAnalysis.overall_visual_score}<span style={{ fontSize: "1rem", color: "var(--text-muted)", fontWeight: 500 }}>/100</span>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#fff" }}>
+                        {visualAnalysis.overall_visual_score >= 85 ? "Brand Certified" : "Remediation Advised"}
+                      </div>
+                      <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
+                        Weighted: 45% Palette, 30% WCAG, 25% Geometry
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="visual-subscores-grid">
+                    <div className="visual-subscore-item">
+                      <div className="label">Palette ΔE₀₀</div>
+                      <div className="val" style={{ color: "var(--cyan)" }}>{visualAnalysis.component_scores.palette_compliance}/100</div>
+                    </div>
+                    <div className="visual-subscore-item">
+                      <div className="label">WCAG Contrast</div>
+                      <div className="val" style={{ color: "var(--emerald)" }}>{visualAnalysis.component_scores.accessibility_contrast}/100</div>
+                    </div>
+                    <div className="visual-subscore-item">
+                      <div className="label">Logo Geometry</div>
+                      <div className="val" style={{ color: "var(--purple)" }}>{visualAnalysis.component_scores.logo_geometry}/100</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Detailed Scientific Breakdown */}
+                <div className="floating-glass-panel">
+                  <div style={{ display: "flex", gap: "0.5rem", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.75rem", marginBottom: "1rem" }}>
+                    <button
+                      className={`tab-pill ${visualActiveSubtab === "palette" ? "active" : ""}`}
+                      onClick={() => setVisualActiveSubtab("palette")}
+                      style={{ fontSize: "0.78rem" }}
+                    >
+                      🎨 CIEDE2000 Palette ({visualAnalysis.extracted_dominant_colors.length})
+                    </button>
+                    <button
+                      className={`tab-pill ${visualActiveSubtab === "wcag" ? "active" : ""}`}
+                      onClick={() => setVisualActiveSubtab("wcag")}
+                      style={{ fontSize: "0.78rem" }}
+                    >
+                      👁️ WCAG 2.1 Accessibility ({visualAnalysis.wcag_accessibility.evaluated_pairs} pairs)
+                    </button>
+                    <button
+                      className={`tab-pill ${visualActiveSubtab === "geometry" ? "active" : ""}`}
+                      onClick={() => setVisualActiveSubtab("geometry")}
+                      style={{ fontSize: "0.78rem" }}
+                    >
+                      📐 Geometry & Safe-Space
+                    </button>
+                  </div>
+
+                  {/* Subtab 1: CIEDE2000 Palette Findings */}
+                  {visualActiveSubtab === "palette" && (
+                    <div>
+                      <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginBottom: "0.75rem" }}>
+                        Dominant color clusters extracted via histogram analysis and evaluated against official brand palette using ISO/CIE CIEDE2000 color distance formula (ΔE ≤ 2.0 considered imperceptible drift).
+                      </p>
+                      <div className="swatch-grid">
+                        {visualAnalysis.color_compliance_findings.map((cf, idx) => (
+                          <div key={idx} className="swatch-box">
+                            <div className="swatch-color-pill" style={{ background: cf.extracted_hex }}></div>
+                            <div className="swatch-meta-hex">{cf.extracted_hex}</div>
+                            <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>{cf.coverage_percent}% coverage</div>
+                            <div className="swatch-meta-delta">
+                              <span style={{ color: "var(--text-muted)" }}>ΔE₀₀: <strong>{cf.delta_e_2000}</strong></span>
+                              <span className={`badge-neon ${cf.severity === "Pass" ? "approved" : cf.severity === "Warning" ? "in-review" : "changes-requested"}`} style={{ fontSize: "0.65rem", padding: "0.1rem 0.35rem" }}>
+                                {cf.severity}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: "0.7rem", color: "var(--cyan)", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.3rem" }}>
+                              Matched: {cf.closest_brand_color} ({cf.closest_brand_hex})
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Subtab 2: WCAG 2.1 Matrix */}
+                  {visualActiveSubtab === "wcag" && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                        <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+                          Relative luminance contrast measured across foreground/background asset layers.
+                        </p>
+                        <span className={`badge-neon ${visualAnalysis.wcag_accessibility.status === "PASS" ? "approved" : "changes-requested"}`}>
+                          WCAG Status: {visualAnalysis.wcag_accessibility.status}
+                        </span>
+                      </div>
+                      <div className="wcag-table-wrap">
+                        <table className="wcag-table">
+                          <thead>
+                            <tr>
+                              <th>Background</th>
+                              <th>Foreground</th>
+                              <th>Ratio</th>
+                              <th>AA Normal (≥4.5:1)</th>
+                              <th>AAA (≥7:1)</th>
+                              <th>Remediation Suggestion</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {visualAnalysis.wcag_accessibility.pairs.map((p, i) => (
+                              <tr key={i}>
+                                <td>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <div style={{ width: 16, height: 16, borderRadius: 4, background: p.background_hex, border: "1px solid rgba(255,255,255,0.2)" }}></div>
+                                    <code>{p.background_hex}</code>
+                                  </div>
+                                </td>
+                                <td>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <div style={{ width: 16, height: 16, borderRadius: 4, background: p.foreground_hex, border: "1px solid rgba(255,255,255,0.2)" }}></div>
+                                    <code>{p.foreground_hex}</code>
+                                  </div>
+                                </td>
+                                <td><strong>{p.contrast_ratio}</strong></td>
+                                <td>
+                                  <span className={`badge-neon ${p.wcag_21_aa_normal ? "approved" : "changes-requested"}`}>
+                                    {p.wcag_21_aa_normal ? "PASS" : "FAIL"}
+                                  </span>
+                                </td>
+                                <td>
+                                  <span className={`badge-neon ${p.wcag_21_aaa_normal ? "approved" : "in-review"}`}>
+                                    {p.wcag_21_aaa_normal ? "PASS" : "FAIL"}
+                                  </span>
+                                </td>
+                                <td style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{p.suggestion}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Subtab 3: Logo Geometry & Safe Space */}
+                  {visualActiveSubtab === "geometry" && (
+                    <div>
+                      <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginBottom: "0.75rem" }}>
+                        Verifies that brand emblem aspect ratio has not been warped/stretched and that clear-space safety perimeter (minimum 10% isolation boundary) has no edge encroachment.
+                      </p>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginTop: "1rem" }}>
+                        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border-glass)", borderRadius: 10, padding: "1rem" }}>
+                          <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Aspect Ratio Lock</div>
+                          <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#fff", marginTop: "0.25rem" }}>
+                            {visualAnalysis.logo_geometry.actual_aspect_ratio}:1
+                          </div>
+                          <div style={{ fontSize: "0.75rem", color: visualAnalysis.logo_geometry.aspect_ratio_compliant ? "var(--emerald)" : "var(--rose)", marginTop: "0.25rem" }}>
+                            {visualAnalysis.logo_geometry.aspect_ratio_compliant ? "✓ Aspect Ratio Locked (Within 5% Tolerance)" : `⚠️ Distorted (${visualAnalysis.logo_geometry.aspect_deviation_percent}% Deviation from target ${visualAnalysis.logo_geometry.target_aspect_ratio}:1)`}
+                          </div>
+                        </div>
+
+                        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border-glass)", borderRadius: 10, padding: "1rem" }}>
+                          <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Safe Space Margin Buffer</div>
+                          <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#fff", marginTop: "0.25rem" }}>
+                            {visualAnalysis.logo_geometry.clear_space_compliant ? "Protected" : "Encroached"}
+                          </div>
+                          <div style={{ fontSize: "0.75rem", color: visualAnalysis.logo_geometry.clear_space_compliant ? "var(--emerald)" : "var(--rose)", marginTop: "0.25rem" }}>
+                            {visualAnalysis.logo_geometry.clear_space_compliant ? "✓ 10% perimeter clear space is uncompromised" : "⚠️ Graphic or boundary clipping detected in isolation perimeter"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: "1rem", background: "rgba(15,23,42,0.6)", padding: "0.85rem", borderRadius: 8, fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                        <strong>Geometric Assessment:</strong> {visualAnalysis.logo_geometry.explanation}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="floating-glass-panel" style={{ textAlign: "center", padding: "3rem" }}>
+                <RefreshCw size={28} className="spin" color="var(--cyan)" style={{ margin: "0 auto 1rem" }} />
+                <p style={{ color: "#fff", fontWeight: 600 }}>Running Multimodal Inspection Pipeline...</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* PILLAR 2: ENTERPRISE PRIVACY SHIELD & AIR-GAPPED INFERENCE        */}
+        {/* ================================================================= */}
+        {activeTab === "privacy" && (
+          <div className="privacy-container">
+            <div className="r3-hero-ribbon">
+              <div className="r3-hero-left">
+                <h2><Lock size={20} color="var(--cyan)" /> Enterprise Privacy Shield & Air-Gapped Pipeline</h2>
+                <p>
+                  Pattern & heuristic redaction radar for API credentials, credit accounts, and confidential ARR metrics.
+                  Features reversible context-preserving vault mapping, zero-data-retention kill-switch, and cryptographic SHA-256 AI disclosure ledger.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                <button
+                  className={`btn-vfx-scan ${privacyAirGapped ? "round3-badge" : ""}`}
+                  onClick={() => {
+                    const nextMode = !privacyAirGapped;
+                    setPrivacyAirGapped(nextMode);
+                    runPrivacyScan(privacyText, nextMode);
+                  }}
+                  style={{ padding: "0.55rem 1rem", fontSize: "0.82rem", display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  {privacyAirGapped ? <CheckCircle2 size={15} color="var(--emerald)" /> : <AlertTriangle size={15} color="var(--amber)" />}
+                  {privacyAirGapped ? "Air-Gapped: 100% Offline" : "External AI Gateway"}
+                </button>
+              </div>
+            </div>
+
+            {/* 1-Click Sensitive Presets */}
+            <div className="r3-preset-strip">
+              <span className="strip-label"><Sparkles size={13} color="var(--cyan)" /> 1-Click Sensitive Copy Presets:</span>
+              <button
+                className="r3-preset-btn"
+                onClick={() => {
+                  const txt = "Confidential Board Memo: Contact CFO Dr. Sarah Jenkins at s.jenkins@apexpay.com or call +1 (555) 234-8901. Do not share live token sk_test_99887766554433221100aabbcc on Slack. Q3 enterprise ARR reached $48.5M ARR with customer vault 4111-2222-3333-4444 on gateway 10.0.4.12.";
+                  setPrivacyText(txt);
+                  runPrivacyScan(txt, privacyAirGapped);
+                }}
+              >
+                <span>🔒</span> CFO Q3 Financial & API Credentials
+              </button>
+              <button
+                className="r3-preset-btn"
+                onClick={() => {
+                  const txt = "Infrastructure Incident Report: Server outage traced to cluster 10.12.84.1. Incident Commander Alex reached at a.turner@cloudrails.io (+44 20 7946 0991). Auth token Bearer ghp_99887766554433221100aabbcc expired. Estimated payout SLA damages: $120,000 profit loss.";
+                  setPrivacyText(txt);
+                  runPrivacyScan(txt, privacyAirGapped);
+                }}
+              >
+                <span>🔑</span> DevOps Incident & Secret Token
+              </button>
+            </div>
+
+            {/* Privacy Radar Split Screen */}
+            <div className="privacy-grid">
+              {/* Raw Input Column */}
+              <div className="privacy-pane">
+                <div className="panel-header-clean" style={{ padding: 0 }}>
+                  <h3 style={{ fontSize: "0.95rem", color: "#fff", fontWeight: 700 }}>Pre-Publication Draft (Raw)</h3>
+                  <span className="badge-neon in-review">Unmasked Input</span>
+                </div>
+                <textarea
+                  className="privacy-textarea"
+                  value={privacyText}
+                  onChange={(e) => setPrivacyText(e.target.value)}
+                  placeholder="Paste memo, PR release, or executive comms containing sensitive figures or secrets..."
+                />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                    Air-gapped scan runs 100% locally with zero external network egress.
+                  </span>
+                  <button
+                    className="btn-vfx-scan"
+                    onClick={() => runPrivacyScan(privacyText, privacyAirGapped)}
+                    disabled={privacyBusy}
+                    style={{ padding: "0.45rem 1rem", fontSize: "0.82rem" }}
+                  >
+                    {privacyBusy ? "Scanning..." : "Scan & Redact Secrets"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Redacted & Masked Column */}
+              <div className="privacy-pane">
+                <div className="panel-header-clean" style={{ padding: 0 }}>
+                  <h3 style={{ fontSize: "0.95rem", color: "#fff", fontWeight: 700 }}>Privacy Shield Masked Output</h3>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    {privacyResult && (
+                      <span className="badge-neon approved" style={{ fontSize: "0.72rem" }}>
+                        {privacyResult.total_redactions} Secrets Isolated
+                      </span>
+                    )}
+                    <button
+                      className="btn-subtle-trans"
+                      onClick={restorePrivacyText}
+                      disabled={!privacyResult}
+                      title="Authorized Brand Manager & Legal Reviewer Reversible Unmasking"
+                      style={{ fontSize: "0.72rem", padding: "0.2rem 0.55rem", display: "inline-flex", alignItems: "center", gap: 4 }}
+                    >
+                      {privacyRestored ? <EyeOff size={12} /> : <Eye size={12} />}
+                      {privacyRestored ? "Hide Original" : "Reveal Vault"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="masked-display-box">
+                  {privacyRestored ? (
+                    <div style={{ color: "#34d399", whiteSpace: "pre-wrap" }}>{privacyText}</div>
+                  ) : privacyResult ? (
+                    <div>{privacyResult.redacted_text}</div>
+                  ) : (
+                    <div style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
+                      Click "Scan & Redact Secrets" or select a preset to view contextual masking...
+                    </div>
+                  )}
+                </div>
+
+                {privacyResult && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginTop: "0.25rem" }}>
+                    {Object.entries(privacyResult.categories_found).map(([cat, count]) => (
+                      <span key={cat} className="badge-neon in-review" style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem" }}>
+                        {cat}: <strong>{count}</strong>
+                      </span>
+                    ))}
+                    <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginLeft: "auto", fontFamily: "var(--font-mono)" }}>
+                      SHA-256: {privacyResult.sha256_hash.slice(0, 16)}...
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Tamper-Evident SHA-256 AI Disclosure Ledger */}
+            <div className="floating-glass-panel" style={{ marginTop: "1.5rem" }}>
+              <div className="panel-header-clean">
+                <div>
+                  <h2><ShieldCheck size={18} color="var(--cyan)" /> Cryptographic AI Disclosure & Audit Ledger</h2>
+                  <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                    Immutable SHA-256 cryptographic audit trail recording model parameters, execution mode, prompt/response digests, and latency.
+                  </p>
+                </div>
+                <button className="btn-subtle-trans" onClick={fetchPrivacyLedger} style={{ fontSize: "0.75rem", padding: "0.3rem 0.7rem" }}>
+                  <RefreshCw size={12} /> Refresh Ledger
+                </button>
+              </div>
+
+              <div className="table-responsive">
+                <table className="disclosure-table">
+                  <thead>
+                    <tr>
+                      <th>Ledger ID</th>
+                      <th>Execution Mode</th>
+                      <th>Model Identifier</th>
+                      <th>Prompt SHA-256</th>
+                      <th>Response SHA-256</th>
+                      <th>Redactions</th>
+                      <th>Latency</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {disclosureLedger.slice(0, 8).map((entry) => (
+                      <tr key={entry.id}>
+                        <td><code>{entry.id}</code></td>
+                        <td>
+                          <span className={`badge-neon ${entry.execution_mode === "AIR_GAPPED_OFFLINE" ? "approved" : "in-review"}`}>
+                            {entry.execution_mode}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{entry.model_identifier}</td>
+                        <td><code style={{ fontSize: "0.7rem" }}>{entry.prompt_hash.slice(0, 14)}...</code></td>
+                        <td><code style={{ fontSize: "0.7rem" }}>{entry.response_hash.slice(0, 14)}...</code></td>
+                        <td><strong>{entry.redaction_count}</strong></td>
+                        <td style={{ fontSize: "0.75rem", color: "var(--purple)" }}>{entry.latency_ms} ms</td>
+                        <td>
+                          <span className="badge-neon approved" style={{ fontSize: "0.68rem" }}>
+                            ✓ TAMPER_EVIDENT
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* PILLAR 3: CONTINUOUS GUIDELINE HEALTH & SELF-HEALING GOVERNANCE   */}
+        {/* ================================================================= */}
+        {activeTab === "governance" && (
+          <div className="governance-container">
+            <div className="r3-hero-ribbon">
+              <div className="r3-hero-left">
+                <h2><Zap size={20} color="var(--cyan)" /> Continuous Guideline Health & Self-Healing Governance</h2>
+                <p>
+                  Adaptive brand intelligence: Analyzes creator disputes, detects policy collisions and contradictory rules,
+                  and generates AI-assisted guideline clarifications with 1-click apply and rollback workflows.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                <button className="btn-subtle-trans" onClick={fetchGovernanceData} style={{ fontSize: "0.8rem", padding: "0.5rem 0.9rem" }}>
+                  <RefreshCw size={13} /> Sync Health Metrics
+                </button>
+              </div>
+            </div>
+
+            {/* Executive Health KPI Cards */}
+            {governanceMetrics && (
+              <div className="health-metrics-row">
+                <div className="health-metric-card">
+                  <div className="title">Guideline Health Score</div>
+                  <div className="val" style={{ color: governanceMetrics.overall_health_score >= 80 ? "var(--emerald)" : "var(--amber)" }}>
+                    {governanceMetrics.overall_health_score}<span style={{ fontSize: "1rem", color: "var(--text-muted)" }}>/100</span>
+                  </div>
+                  <div className="delta">✓ Evaluated against 18 Active Rules</div>
+                </div>
+
+                <div className="health-metric-card">
+                  <div className="title">Mean Time to Approval (MTTA)</div>
+                  <div className="val" style={{ color: "var(--cyan)" }}>
+                    {governanceMetrics.mean_time_to_approval_hours} <span style={{ fontSize: "1rem", fontWeight: 600 }}>hrs</span>
+                  </div>
+                  <div className="delta">↓ {governanceMetrics.mtta_reduction_pct}% Velocity Improvement</div>
+                </div>
+
+                <div className="health-metric-card">
+                  <div className="title">Active Policy Collisions</div>
+                  <div className="val" style={{ color: governanceMetrics.active_conflicts_count > 0 ? "var(--rose)" : "var(--emerald)" }}>
+                    {governanceMetrics.active_conflicts_count}
+                  </div>
+                  <div className="delta" style={{ color: "var(--text-secondary)" }}>
+                    {governanceMetrics.resolved_conflicts_count} Resolved by Self-Healing
+                  </div>
+                </div>
+
+                <div className="health-metric-card">
+                  <div className="title">High-Friction Rules</div>
+                  <div className="val" style={{ color: "var(--amber)" }}>
+                    {governanceMetrics.high_friction_rules_count}
+                  </div>
+                  <div className="delta" style={{ color: "var(--text-secondary)" }}>
+                    {governanceMetrics.healthy_rules_count} Healthy Rules
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Governance Subtabs */}
+            <div style={{ display: "flex", gap: "0.5rem", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.75rem", marginBottom: "1.25rem" }}>
+              <button
+                className={`tab-pill ${governanceTab === "conflicts" ? "active" : ""}`}
+                onClick={() => setGovernanceTab("conflicts")}
+              >
+                <AlertTriangle size={14} /> Conflicting Guidelines ({conflicts.filter(c => c.status === "ACTIVE_COLLISION").length})
+              </button>
+              <button
+                className={`tab-pill ${governanceTab === "proposals" ? "active" : ""}`}
+                onClick={() => setGovernanceTab("proposals")}
+              >
+                <Sparkles size={14} /> AI Self-Healing Proposals ({proposals.length})
+              </button>
+              <button
+                className={`tab-pill ${governanceTab === "disputes" ? "active" : ""}`}
+                onClick={() => setGovernanceTab("disputes")}
+              >
+                <Activity size={14} /> Rule Dispute Leaderboard ({disputeStats.length})
+              </button>
+            </div>
+
+            {/* Subtab 1: Conflicting Guidelines & Collisions */}
+            {governanceTab === "conflicts" && (
+              <div>
+                <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginBottom: "1rem" }}>
+                  Algorithmic contradiction detection identifies policy collision points where following one brand rule inevitably breaches another.
+                </p>
+
+                {conflicts.map((conf) => (
+                  <div key={conf.id} className="collision-card">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span className={`badge-neon ${conf.severity === "CRITICAL" ? "changes-requested" : "in-review"}`}>
+                          {conf.severity} COLLISION
+                        </span>
+                        <strong style={{ color: "#fff", fontSize: "0.95rem" }}>{conf.title}</strong>
+                      </div>
+                      <span className={`badge-neon ${conf.status === "ACTIVE_COLLISION" ? "changes-requested" : "approved"}`}>
+                        {conf.status}
+                      </span>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", margin: "0.75rem 0" }}>
+                      <div style={{ background: "rgba(15,23,42,0.8)", padding: "0.75rem", borderRadius: 8, border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <div style={{ fontSize: "0.7rem", color: "var(--cyan)", fontWeight: 700, textTransform: "uppercase" }}>Rule A: {conf.rule_a_id} ({conf.rule_a_name})</div>
+                        <div style={{ fontSize: "0.8rem", color: "#fff", marginTop: "0.25rem", fontStyle: "italic" }}>“{conf.rule_a_excerpt}”</div>
+                      </div>
+                      <div style={{ background: "rgba(15,23,42,0.8)", padding: "0.75rem", borderRadius: 8, border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <div style={{ fontSize: "0.7rem", color: "var(--purple)", fontWeight: 700, textTransform: "uppercase" }}>Rule B: {conf.rule_b_id} ({conf.rule_b_name})</div>
+                        <div style={{ fontSize: "0.8rem", color: "#fff", marginTop: "0.25rem", fontStyle: "italic" }}>“{conf.rule_b_excerpt}”</div>
+                      </div>
+                    </div>
+
+                    <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "0.5rem" }}>
+                      <strong>Operational Impact:</strong> {conf.impact_description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Subtab 2: AI Clarification Proposals & 1-Click Auto-Healing */}
+            {governanceTab === "proposals" && (
+              <div>
+                <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginBottom: "1rem" }}>
+                  AI-assisted self-healing proposals synthesize conflicting guidelines into clear, scoped directives. Administrators can approve in 1 click or safely rollback.
+                </p>
+
+                {proposals.map((prop) => (
+                  <div key={prop.id} className="floating-glass-panel" style={{ marginBottom: "1.25rem" }}>
+                    <div className="panel-header-clean">
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <Sparkles size={18} color="var(--cyan)" />
+                        <h3 style={{ fontSize: "1rem", color: "#fff", fontWeight: 700 }}>{prop.title}</h3>
+                        <span className={`badge-neon ${prop.status === "APPLIED" ? "approved" : prop.status === "ROLLED_BACK" ? "changes-requested" : "in-review"}`}>
+                          {prop.status}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                        {prop.status !== "APPLIED" ? (
+                          <button
+                            className="btn-stamped-approve"
+                            onClick={() => handleApplyClarification(prop.id)}
+                            style={{ fontSize: "0.78rem", padding: "0.35rem 0.85rem" }}
+                          >
+                            ⚡ Accept Clarification & Auto-Heal
+                          </button>
+                        ) : (
+                          <button
+                            className="btn-vfx-reject"
+                            onClick={() => handleRollbackClarification(prop.id)}
+                            style={{ fontSize: "0.78rem", padding: "0.35rem 0.85rem" }}
+                          >
+                            ↺ Rollback Proposal
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="proposal-diff-box">
+                      <div className="proposal-diff-col" style={{ borderRight: "1px solid rgba(255,255,255,0.06)", paddingRight: "1rem" }}>
+                        <span style={{ fontSize: "0.7rem", color: "var(--rose)", fontWeight: 700, textTransform: "uppercase" }}>Previous Ambiguous Directives:</span>
+                        <p style={{ color: "var(--text-secondary)", marginTop: "0.35rem" }}>{prop.original_text}</p>
+                      </div>
+                      <div className="proposal-diff-col">
+                        <span style={{ fontSize: "0.7rem", color: "var(--emerald)", fontWeight: 700, textTransform: "uppercase" }}>Proposed Harmonized Clarification:</span>
+                        <p style={{ color: "#fff", fontWeight: 600, marginTop: "0.35rem" }}>{prop.proposed_clarification}</p>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.75rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                      <span><strong>Rationale:</strong> {prop.rationale}</span>
+                      <div style={{ display: "flex", gap: "0.75rem" }}>
+                        <span style={{ color: "var(--emerald)" }}>Dispute Reduction: ~{prop.estimated_dispute_reduction_pct}%</span>
+                        <span style={{ color: "var(--cyan)" }}>Confidence: {prop.confidence_score}%</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Subtab 3: Statistical Dispute Leaderboard */}
+            {governanceTab === "disputes" && (
+              <div>
+                <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginBottom: "1rem" }}>
+                  Aggregated dispute analytics: Measures rule friction indices based on creator dismissal frequency, false-positive dispute volume, and rejection reasons.
+                </p>
+
+                <div className="table-responsive">
+                  <table className="vfx-table">
+                    <thead>
+                      <tr>
+                        <th>Rule ID</th>
+                        <th>Guideline Title</th>
+                        <th>Category</th>
+                        <th>Evaluations</th>
+                        <th>Disputes</th>
+                        <th>Dispute Rate</th>
+                        <th>Friction Index</th>
+                        <th>Health Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {disputeStats.map((ds) => (
+                        <tr key={ds.rule_id}>
+                          <td><code>{ds.rule_id}</code></td>
+                          <td>
+                            <div style={{ fontWeight: 600, color: "#fff" }}>{ds.rule_name}</div>
+                            <small style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                              Top reason: “{ds.top_dispute_reasons[0] || 'N/A'}”
+                            </small>
+                          </td>
+                          <td><span className="badge-neon in-review">{ds.category}</span></td>
+                          <td>{ds.total_evaluations}</td>
+                          <td><strong style={{ color: ds.dispute_count > 10 ? "var(--rose)" : "#fff" }}>{ds.dispute_count}</strong></td>
+                          <td>{ds.dispute_rate_pct}%</td>
+                          <td>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <strong>{ds.friction_index}/10</strong>
+                              <div className="friction-bar-track" style={{ width: 60 }}>
+                                <div
+                                  className="friction-bar-fill"
+                                  style={{
+                                    width: `${Math.min(100, ds.friction_index * 10)}%`,
+                                    background: ds.friction_index >= 3.0 ? "var(--rose)" : ds.friction_index >= 1.5 ? "var(--amber)" : "var(--emerald)"
+                                  }}
+                                ></div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <span className={`badge-neon ${ds.status === "HEALTHY" ? "approved" : ds.status === "ATTENTION" ? "in-review" : "changes-requested"}`}>
+                              {ds.status}
+                            </span>
+                          </td>
+                          <td>
+                            <button
+                              className="btn-subtle-trans"
+                              onClick={() => {
+                                setDisputeModal(ds);
+                                setDisputeReasonInput("");
+                              }}
+                              style={{ fontSize: "0.7rem", padding: "0.2rem 0.5rem" }}
+                            >
+                              File Dispute
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Live Dispute Modal */}
+            {disputeModal && (
+              <div className="modal-overlay-custom" role="dialog" aria-modal="true" aria-labelledby="modal-disp-title">
+                <div className="modal-dialog-custom">
+                  <h3 id="modal-disp-title" style={{ color: "#fff", fontSize: "1.05rem", fontWeight: 700 }}>
+                    File Dispute on {disputeModal.rule_id}
+                  </h3>
+                  <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                    Logging disputes feeds the self-healing governance engine to adapt or clarify overly restrictive rules.
+                  </p>
+                  <div style={{ marginTop: "0.75rem" }}>
+                    <label className="meta-label">Dispute Reason & Scenario Context</label>
+                    <textarea
+                      className="glass-field-textarea"
+                      style={{ minHeight: 80 }}
+                      placeholder="E.g., Rule conflicts with marketing promotion brief; phrasing was approved by director..."
+                      value={disputeReasonInput}
+                      onChange={(e) => setDisputeReasonInput(e.target.value)}
+                    />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
+                    <button className="btn-subtle-trans" onClick={() => setDisputeModal(null)}>Cancel</button>
+                    <button className="btn-stamped-approve" onClick={handleSubmitDispute}>Log Dispute Event</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
 
         {/* TAB 2: BRAND KNOWLEDGE HUB */}
         {activeTab === "knowledge" && brandKit && (

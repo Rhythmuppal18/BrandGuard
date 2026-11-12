@@ -20,6 +20,38 @@ from app.services.certificate_service import generate_compliance_certificate
 from app.services.docx_export_service import generate_approved_docx
 from app.services.extractor import extract_text_from_file
 from app.services.rules_engine import analyze_content
+from app.services.visual_engine import (
+    inspect_visual_asset, OFFICIAL_BRAND_PALETTE, get_sample_visual_assets
+)
+from app.services.privacy_engine import (
+    scan_and_redact_pii, restore_redacted_text, record_ai_disclosure, get_ai_disclosure_ledger
+)
+from app.services.governance_health_service import (
+    get_rule_dispute_analytics, get_conflicting_guidelines, get_clarification_proposals,
+    apply_clarification_proposal, rollback_clarification_proposal, record_rule_dispute,
+    get_governance_metrics
+)
+from pydantic import BaseModel, Field
+
+class VisualInspectRequest(BaseModel):
+    image_base64: str
+    filename: Optional[str] = "asset.png"
+    asset_type: str = "banner"
+
+class PrivacyScanRequest(BaseModel):
+    text: str
+    air_gapped_mode: bool = True
+
+class PrivacyRestoreRequest(BaseModel):
+    scan_id: str
+    redacted_text: str
+
+class DisputeCreateRequest(BaseModel):
+    rule_id: str
+    rule_name: str
+    category: str
+    reason: str
+    user_role: str = "Content Creator"
 
 router = APIRouter(prefix="/api")
 
@@ -392,3 +424,142 @@ def get_round3_commitments():
             }
         ]
     }
+
+
+# =====================================================================
+# PILLAR 1: MULTIMODAL VISUAL & ACCESSIBILITY COMPLIANCE ENGINE
+# =====================================================================
+
+@router.post("/visual/inspect")
+def inspect_visual_endpoint(req: VisualInspectRequest):
+    """
+    Ingests an image asset (PNG, JPG, SVG/Raster) via base64, runs CIEDE2000
+    brand color delta, logo aspect-ratio & margin analysis, and WCAG 2.1 contrast matrix.
+    """
+    try:
+        raw_b64 = req.image_base64
+        if "," in raw_b64:
+            raw_b64 = raw_b64.split(",", 1)[1]
+        image_bytes = base64.b64decode(raw_b64)
+        
+        result = inspect_visual_asset(
+            image_bytes=image_bytes,
+            filename=req.filename or "uploaded_asset.png",
+            brand_palette=OFFICIAL_BRAND_PALETTE,
+            target_logo_aspect=1.0 if req.asset_type == "logo" else None
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Visual asset inspection failed: {str(e)}")
+
+@router.get("/visual/palette")
+def get_visual_palette():
+    """Returns official ApexPay brand palette with reference LAB coordinates."""
+    return {"brand_palette": OFFICIAL_BRAND_PALETTE}
+
+@router.get("/visual/samples")
+def get_visual_samples():
+    """Returns pre-generated synthetic visual assets for instantaneous 1-click evaluation."""
+    return {"samples": get_sample_visual_assets()}
+
+
+# =====================================================================
+# PILLAR 2: ENTERPRISE PRIVACY SHIELD & AIR-GAPPED INFERENCE PIPELINE
+# =====================================================================
+
+@router.post("/privacy/scan-redact")
+def scan_and_redact_endpoint(req: PrivacyScanRequest):
+    """
+    Executes pattern and heuristic PII/secret redaction with reversible vault storage
+    and logs cryptographic SHA-256 AI disclosure entry.
+    """
+    start_time = time.time()
+    result = scan_and_redact_pii(req.text, air_gapped_mode=req.air_gapped_mode)
+    latency_ms = round((time.time() - start_time) * 1000, 2)
+    
+    # Record disclosure ledger entry
+    ledger_entry = record_ai_disclosure(
+        prompt=req.text,
+        response=result.redacted_text,
+        mode="AIR_GAPPED_OFFLINE" if req.air_gapped_mode else "STANDARD_EXTERNAL_GATEWAY",
+        model="Deterministic-PrivacyShield-v3",
+        redaction_count=result.total_redactions,
+        categories=list(result.categories_found.keys()),
+        latency_ms=latency_ms
+    )
+    
+    return {
+        "scan_result": result.model_dump(),
+        "disclosure_entry": ledger_entry.model_dump()
+    }
+
+@router.post("/privacy/restore")
+def restore_privacy_endpoint(req: PrivacyRestoreRequest):
+    """
+    Reversibly restores redacted tokens for authorized brand managers and compliance officers.
+    """
+    restored = restore_redacted_text(req.scan_id, req.redacted_text)
+    return {"restored_text": restored}
+
+@router.get("/privacy/ledger")
+def get_privacy_ledger(limit: int = 25):
+    """Returns cryptographic AI disclosure and audit ledger with SHA-256 verification hashes."""
+    entries = get_ai_disclosure_ledger(limit=limit)
+    return {"ledger": [e if isinstance(e, dict) else e.model_dump() for e in entries]}
+
+
+# =====================================================================
+# PILLAR 3: CONTINUOUS GUIDELINE HEALTH & SELF-HEALING GOVERNANCE
+# =====================================================================
+
+@router.get("/governance/health-metrics")
+def get_health_metrics_endpoint():
+    """Returns overall brand guideline health, MTTA velocity, and friction stats."""
+    return get_governance_metrics().model_dump()
+
+@router.get("/governance/disputes")
+def get_disputes_endpoint():
+    """Returns statistical dispute analytics per rule with friction index leaderboard."""
+    stats = get_rule_dispute_analytics()
+    return {"dispute_analytics": [s.model_dump() for s in stats]}
+
+@router.post("/governance/dispute")
+def create_dispute_endpoint(req: DisputeCreateRequest):
+    """Records a live dispute filed by a creator or reviewer on a specific brand rule."""
+    record = record_rule_dispute(
+        rule_id=req.rule_id,
+        rule_name=req.rule_name,
+        category=req.category,
+        reason=req.reason,
+        user_role=req.user_role
+    )
+    return {"status": "success", "dispute": record.model_dump()}
+
+@router.get("/governance/conflicts")
+def get_conflicts_endpoint():
+    """Returns detected contradictory policies, tone collisions, and obsolete facts."""
+    conflicts = get_conflicting_guidelines()
+    return {"conflicts": [c.model_dump() for c in conflicts]}
+
+@router.get("/governance/proposals")
+def get_proposals_endpoint():
+    """Returns AI-assisted self-healing rule clarification proposals."""
+    proposals = get_clarification_proposals()
+    return {"proposals": [p.model_dump() for p in proposals]}
+
+@router.post("/governance/proposals/{proposal_id}/apply")
+def apply_proposal_endpoint(proposal_id: str, admin_user: Optional[str] = "Brand Administrator"):
+    """1-Click approval and auto-healing: promotes revised rule and resolves active conflict."""
+    res = apply_clarification_proposal(proposal_id, admin_user=admin_user)
+    if not res["success"]:
+        raise HTTPException(status_code=404, detail=res["message"])
+    return res
+
+@router.post("/governance/proposals/{proposal_id}/rollback")
+def rollback_proposal_endpoint(proposal_id: str, admin_user: Optional[str] = "Brand Administrator"):
+    """Rolls back an applied clarification proposal to previous guideline revision."""
+    res = rollback_clarification_proposal(proposal_id, admin_user=admin_user)
+    if not res["success"]:
+        raise HTTPException(status_code=404, detail=res["message"])
+    return res
+
