@@ -4,27 +4,33 @@ from app.services.visual_engine import (
     hex_to_rgb, rgb_to_hex, rgb_to_lab, ciede2000,
     calculate_contrast_ratio, extract_dominant_colors,
     evaluate_palette_compliance, analyze_logo_geometry,
-    evaluate_wcag_contrast, inspect_visual_asset
+    evaluate_wcag_contrast, inspect_visual_asset, parse_svg_asset
 )
 
-def test_ciede2000_mathematics():
-    print("Testing CIEDE2000 Color Difference...")
-    # Identical colors
-    lab_cyan1 = rgb_to_lab(6, 182, 212)
-    lab_cyan2 = rgb_to_lab(6, 182, 212)
-    de_zero = ciede2000(lab_cyan1, lab_cyan2)
-    assert de_zero == 0.0, f"Expected 0.0, got {de_zero}"
+def test_ciede2000_sharma_reference_vectors():
+    print("Testing CIEDE2000 against published Sharma 2005 Reference Vectors...")
+    # Reference Pair 1 from Sharma et al. (2005) Table 4:
+    # Lab1 = [50.0, 2.6772, -79.7751], Lab2 = [50.0, 0.0000, -82.7485] -> Expected ΔE00 = 2.0425
+    lab1 = (50.0, 2.6772, -79.7751)
+    lab2 = (50.0, 0.0000, -82.7485)
+    de1 = ciede2000(lab1, lab2)
+    assert abs(de1 - 2.0425) < 0.05, f"Pair 1 failed: got {de1}, expected 2.0425"
 
-    # Very close shade (slight tint)
-    lab_cyan_close = rgb_to_lab(10, 185, 215)
-    de_close = ciede2000(lab_cyan1, lab_cyan_close)
-    assert 0.1 <= de_close <= 2.0, f"Expected minor tolerance, got {de_close}"
+    # Reference Pair 2:
+    # Lab1 = [50.0, 3.1571, -77.2803], Lab2 = [50.0, 0.0000, -82.7485] -> Expected ΔE00 = 2.8615
+    lab3 = (50.0, 3.1571, -77.2803)
+    de2 = ciede2000(lab3, lab2)
+    assert abs(de2 - 2.8615) < 0.05, f"Pair 2 failed: got {de2}, expected 2.8615"
 
-    # Vastly different colors: Cyan vs Stark Red
-    lab_red = rgb_to_lab(244, 63, 94)
-    de_far = ciede2000(lab_cyan1, lab_red)
-    assert de_far > 30.0, f"Expected large delta E, got {de_far}"
-    print(f"  ✓ Zero distance: {de_zero}, Close delta: {de_close}, Opposing delta: {de_far}")
+    # Reference Pair 3:
+    # Lab1 = [50.0, 2.8361, -74.0200], Lab2 = [50.0, 0.0000, -82.7485] -> Expected ΔE00 = 3.4412
+    lab4 = (50.0, 2.8361, -74.0200)
+    de3 = ciede2000(lab4, lab2)
+    assert abs(de3 - 3.4412) < 0.05, f"Pair 3 failed: got {de3}, expected 3.4412"
+
+    print(f"  ✓ Sharma Vector 1: {de1} (Expected: 2.0425)")
+    print(f"  ✓ Sharma Vector 2: {de2} (Expected: 2.8615)")
+    print(f"  ✓ Sharma Vector 3: {de3} (Expected: 3.4412)")
 
 def test_wcag_contrast_ratios():
     print("Testing WCAG 2.1 Contrast Calculations...")
@@ -41,27 +47,45 @@ def test_wcag_contrast_ratios():
     assert ratio_low < 3.0, f"Expected < 3.0, got {ratio_low}"
     print(f"  ✓ Max ratio: {ratio_max}:1, Brand text ratio: {ratio_navy}:1, Low ratio: {ratio_low}:1")
 
-def test_synthetic_image_inspection():
-    print("Testing Full Visual Inspection Pipeline on Synthetic Asset...")
-    # Create synthetic test graphic: 600x600 square banner with brand cyan background & white emblem
-    img = Image.new("RGB", (600, 600), color=(5, 8, 17))
-    draw = ImageDraw.Draw(img)
-    # Draw central emblem in brand cyan (#06B6D4)
-    draw.rectangle([150, 150, 450, 450], fill=(6, 182, 212))
-    # Draw stark white typography text box
-    draw.rectangle([250, 250, 350, 350], fill=(255, 255, 255))
+def test_logo_boundary_and_clear_space():
+    print("Testing Geometric Logo Boundary & Clear Space Detection...")
+    # Create an image with an off-center logo touching the left border (clear space violation)
+    img_encroached = Image.new("RGB", (400, 400), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img_encroached)
+    # Draw logo at x=2, y=50 (encroaches left margin, min_margin = 2px)
+    draw.rectangle([2, 50, 200, 250], fill=(37, 99, 235))
 
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    raw_bytes = buf.getvalue()
+    geom_fail = analyze_logo_geometry(img_encroached, target_aspect_ratio=1.0, required_clear_space_pct=10.0)
+    assert geom_fail["clear_space_compliant"] is False
+    assert geom_fail["minimum_margin_px"] <= 2
+    print(f"  ✓ Correctly flagged clear-space encroachment: {geom_fail['minimum_margin_px']}px < {geom_fail['required_margin_px']}px")
 
-    result = inspect_visual_asset(raw_bytes, "test_banner.png", target_logo_aspect=1.0)
-    assert result["overall_visual_score"] >= 80, f"Expected score >= 80, got {result['overall_visual_score']}"
-    assert result["logo_geometry"]["aspect_ratio_compliant"] is True
-    assert len(result["extracted_dominant_colors"]) >= 3
-    print(f"  ✓ Synthetic Banner Overall Score: {result['overall_visual_score']}/100")
-    print(f"  ✓ Clearance Status: {result['clearance_status']}")
-    print(f"  ✓ Dominant colors extracted: {[c['hex'] for c in result['extracted_dominant_colors']]}")
+    # Create an image with centered logo and ample safe padding
+    img_safe = Image.new("RGB", (400, 400), color=(255, 255, 255))
+    draw_safe = ImageDraw.Draw(img_safe)
+    draw_safe.rectangle([100, 100, 300, 300], fill=(37, 99, 235))
+
+    geom_pass = analyze_logo_geometry(img_safe, target_aspect_ratio=1.0, required_clear_space_pct=10.0)
+    assert geom_pass["clear_space_compliant"] is True
+    assert geom_pass["minimum_margin_px"] >= 90
+    print(f"  ✓ Verified safe-space margin: {geom_pass['minimum_margin_px']}px >= {geom_pass['required_margin_px']}px")
+
+def test_svg_vector_asset_support():
+    print("Testing Native SVG Vector Asset Ingestion & WCAG Validation...")
+    svg_sample = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 300" width="500" height="300">
+      <rect width="500" height="300" fill="#050811"/>
+      <circle cx="150" cy="150" r="80" fill="#3B82F6"/>
+      <text x="320" y="160" font-size="24" fill="#06B6D4">APEXPAY CLOUD</text>
+    </svg>"""
+
+    result = inspect_visual_asset(svg_sample.encode("utf-8"), "banner.svg", target_logo_aspect=None)
+    assert result["format"] == "SVG"
+    assert result["dimensions"]["width"] == 500
+    assert result["dimensions"]["height"] == 300
+    assert len(result["extracted_dominant_colors"]) >= 2
+    assert result["wcag_accessibility"]["status"] == "PASS"
+    print(f"  ✓ SVG Vector Inspection Successful: Format={result['format']}, Score={result['overall_visual_score']}")
+    print(f"  ✓ Detected Colors: {[c['hex'] for c in result['extracted_dominant_colors']]}")
 
 def test_corrupted_file_handling():
     print("Testing Corrupted Asset Validation...")
@@ -76,11 +100,11 @@ if __name__ == "__main__":
     print("========================================")
     print(" RUNNING PILLAR 1 VISUAL ENGINE TESTS   ")
     print("========================================")
-    test_ciede2000_mathematics()
+    test_ciede2000_sharma_reference_vectors()
     test_wcag_contrast_ratios()
-    test_synthetic_image_inspection()
+    test_logo_boundary_and_clear_space()
+    test_svg_vector_asset_support()
     test_corrupted_file_handling()
     print("========================================")
     print(" ALL PILLAR 1 VISUAL ENGINE TESTS PASSED!")
     print("========================================")
-

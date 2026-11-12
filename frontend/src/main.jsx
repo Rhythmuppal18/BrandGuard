@@ -217,15 +217,30 @@ function App() {
     reader.readAsDataURL(file);
   }
 
+  function getAuthHeaders() {
+    const personaMap = {
+      "Creator": "creator",
+      "Brand Manager": "manager",
+      "Legal & Compliance Reviewer": "legal",
+      "Brand Admin": "admin"
+    };
+    const pKey = personaMap[currentRole] || "creator";
+    return {
+      "Content-Type": "application/json",
+      "X-Persona": pKey
+    };
+  }
+
   // --- PILLAR 2: PRIVACY SHIELD HANDLERS ---
   async function runPrivacyScan(textToScan, airGapped) {
     if (!textToScan) return;
     setPrivacyBusy(true);
     setPrivacyRestored(false);
+    setError("");
     try {
       const res = await fetch(`${API_BASE}/privacy/scan-redact`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           text: textToScan,
           air_gapped_mode: airGapped !== undefined ? airGapped : privacyAirGapped
@@ -251,10 +266,11 @@ function App() {
       return;
     }
     setPrivacyBusy(true);
+    setError("");
     try {
       const res = await fetch(`${API_BASE}/privacy/restore`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           scan_id: privacyResult.scan_id,
           redacted_text: privacyResult.redacted_text
@@ -262,9 +278,13 @@ function App() {
       });
       if (res.ok) {
         setPrivacyRestored(true);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.detail || "Access Denied: Reversible PII restoration requires Brand Admin or Legal Reviewer role. Switch role in the sidebar.");
       }
     } catch (e) {
       console.error(e);
+      setError("Error executing vault restoration.");
     } finally {
       setPrivacyBusy(false);
     }
@@ -272,7 +292,9 @@ function App() {
 
   async function fetchPrivacyLedger() {
     try {
-      const res = await fetch(`${API_BASE}/privacy/ledger?limit=25`);
+      const res = await fetch(`${API_BASE}/privacy/ledger?limit=25`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         setDisclosureLedger(data.ledger || []);
@@ -287,10 +309,10 @@ function App() {
     setGovernanceBusy(true);
     try {
       const [mRes, dRes, cRes, pRes] = await Promise.all([
-        fetch(`${API_BASE}/governance/health-metrics`),
-        fetch(`${API_BASE}/governance/disputes`),
-        fetch(`${API_BASE}/governance/conflicts`),
-        fetch(`${API_BASE}/governance/proposals`)
+        fetch(`${API_BASE}/governance/health-metrics`, { headers: getAuthHeaders() }),
+        fetch(`${API_BASE}/governance/disputes`, { headers: getAuthHeaders() }),
+        fetch(`${API_BASE}/governance/conflicts`, { headers: getAuthHeaders() }),
+        fetch(`${API_BASE}/governance/proposals`, { headers: getAuthHeaders() })
       ]);
       if (mRes.ok) setGovernanceMetrics(await mRes.json());
       if (dRes.ok) setDisputeStats((await dRes.json()).dispute_analytics || []);
@@ -305,12 +327,16 @@ function App() {
 
   async function handleApplyClarification(proposalId) {
     try {
-      const res = await fetch(`${API_BASE}/governance/proposals/${proposalId}/apply?admin_user=${encodeURIComponent(currentRole)}`, {
-        method: "POST"
+      const res = await fetch(`${API_BASE}/governance/proposals/${proposalId}/apply`, {
+        method: "POST",
+        headers: getAuthHeaders()
       });
       if (res.ok) {
         fetchGovernanceData();
         triggerConfetti();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.detail || "Access Denied: Applying guideline proposals requires Brand Admin or Legal Reviewer role.");
       }
     } catch (e) {
       console.error(e);
@@ -319,12 +345,16 @@ function App() {
 
   async function handleRollbackClarification(proposalId) {
     try {
-      const res = await fetch(`${API_BASE}/governance/proposals/${proposalId}/rollback?admin_user=${encodeURIComponent(currentRole)}`, {
-        method: "POST"
+      const res = await fetch(`${API_BASE}/governance/proposals/${proposalId}/rollback`, {
+        method: "POST",
+        headers: getAuthHeaders()
       });
       if (res.ok) {
         fetchGovernanceData();
         triggerConfetti();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.detail || "Access Denied: Rolling back guideline proposals requires Brand Admin or Legal Reviewer role.");
       }
     } catch (e) {
       console.error(e);

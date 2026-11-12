@@ -6,7 +6,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 
-from app.core.config import FRONTEND_DIST
+from app.core.config import FRONTEND_DIST, ALLOWED_ORIGINS
 from app.core.database import init_db
 from app.api.endpoints import router as api_router
 
@@ -22,12 +22,12 @@ app = FastAPI(
 # GZip compression for ultra-fast transfers (Lighthouse Performance 95+)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
-# Enable CORS for flexible local and preview environments
+# Secure CORS restricted to configured origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

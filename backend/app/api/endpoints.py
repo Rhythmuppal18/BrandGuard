@@ -1,10 +1,16 @@
 import time
 import base64
 import io
-import docx
-from fastapi import APIRouter, HTTPException, Response
+from pathlib import Path
+from fastapi import APIRouter, HTTPException, Response, Depends, status
 from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, Field
 
+from app.core.config import MAX_UPLOAD_SIZE_BYTES, ALLOWED_FILE_EXTENSIONS, DEFAULT_TENANT_ID
+from app.core.auth import (
+    get_current_user, require_role, create_access_token,
+    ROLE_ADMIN, ROLE_COMPLIANCE, ROLE_MANAGER, ROLE_CREATOR, PERSONA_REGISTRY
+)
 from app.models.schemas import (
     ReviewRequest, ReviewAnalysisResponse, SuggestionActionRequest,
     TransitionRequest, CommentCreateRequest, BrandKit, BenchmarkItem,
@@ -24,14 +30,18 @@ from app.services.visual_engine import (
     inspect_visual_asset, OFFICIAL_BRAND_PALETTE, get_sample_visual_assets
 )
 from app.services.privacy_engine import (
-    scan_and_redact_pii, restore_redacted_text, record_ai_disclosure, get_ai_disclosure_ledger
+    scan_and_redact_pii, restore_redacted_text, record_ai_disclosure,
+    get_ai_disclosure_ledger, verify_ledger_integrity
 )
 from app.services.governance_health_service import (
     get_rule_dispute_analytics, get_conflicting_guidelines, get_clarification_proposals,
     apply_clarification_proposal, rollback_clarification_proposal, record_rule_dispute,
     get_governance_metrics
 )
-from pydantic import BaseModel, Field
+
+# ---------------------------------------------------------------------------
+# Request Models
+# ---------------------------------------------------------------------------
 
 class VisualInspectRequest(BaseModel):
     image_base64: str
@@ -53,7 +63,14 @@ class DisputeCreateRequest(BaseModel):
     reason: str
     user_role: str = "Content Creator"
 
+class AuthTokenRequest(BaseModel):
+    persona: str = "creator"
+
 router = APIRouter(prefix="/api")
+
+# =====================================================================
+# SYSTEM & AUTHENTICATION
+# =====================================================================
 
 @router.get("/health")
 def health_check():
@@ -61,7 +78,41 @@ def health_check():
         "status": "healthy",
         "service": "BrandGuard Enterprise Governance Engine",
         "version": "3.0.0-final",
-        "environment": "CodeTitans India 2026 Round 3 Finalist"
+        "environment": "CodeTitans India 2026 Round 3 Finalist",
+        "auth_mode": "Enterprise RBAC Enforced",
+        "tenant_id": DEFAULT_TENANT_ID
+    }
+
+@router.get("/auth/personas")
+def list_personas():
+    """Returns available enterprise simulation personas and their RBAC tiers."""
+    personas_list = []
+    for key, p in PERSONA_REGISTRY.items():
+        token = create_access_token(p["id"], p["role"], p["name"], p["tenant_id"])
+        personas_list.append({
+            "key": key,
+            "id": p["id"],
+            "name": p["name"],
+            "email": p["email"],
+            "role": p["role"],
+            "token": token
+        })
+    return {"personas": personas_list}
+
+@router.post("/auth/token")
+def issue_token(req: AuthTokenRequest):
+    """Issues a cryptographically signed HMAC-SHA256 session token for a chosen persona."""
+    persona_key = req.persona.lower().strip()
+    if persona_key not in PERSONA_REGISTRY:
+        raise HTTPException(status_code=400, detail=f"Unknown persona '{req.persona}'. Allowed: {list(PERSONA_REGISTRY.keys())}")
+    p = PERSONA_REGISTRY[persona_key]
+    token = create_access_token(p["id"], p["role"], p["name"], p["tenant_id"])
+    return {
+        "access_token": token,
+        "token_type": "Bearer",
+        "role": p["role"],
+        "name": p["name"],
+        "tenant_id": p["tenant_id"]
     }
 
 @router.get("/scenarios")
@@ -69,75 +120,95 @@ def get_scenarios():
     """Returns preloaded industry benchmark scenarios for one-click testing."""
     return get_preloaded_scenarios()
 
+# =====================================================================
+# BRAND KNOWLEDGE & POLICY MANAGEMENT
+# =====================================================================
+
 @router.get("/brand", response_model=BrandKit)
 def get_brand():
     """Returns the active brand kit including approved facts, terms, and rules."""
     return get_current_brand_kit()
 
 @router.post("/brand")
-def update_brand(kit: BrandKit):
-    """Updates the brand knowledge base."""
+def update_brand(kit: BrandKit, user: Dict[str, Any] = Depends(require_role([ROLE_ADMIN, ROLE_MANAGER]))):
+    """Updates the brand knowledge base. Requires Brand Manager or Admin."""
     save_brand_kit(kit)
-    return {"status": "success", "message": "Brand guidelines and knowledge base updated."}
+    return {"status": "success", "message": f"Brand guidelines updated by {user['name']}."}
 
 @router.post("/brand/fact")
-def add_brand_fact(fact: ApprovedFact):
-    """Dynamically registers a verified enterprise fact into the active knowledge base."""
+def add_brand_fact(fact: ApprovedFact, user: Dict[str, Any] = Depends(require_role([ROLE_ADMIN, ROLE_MANAGER]))):
+    """Registers a verified enterprise fact into active knowledge base."""
     kit = get_current_brand_kit()
     kit.approved_facts.append(fact)
     save_brand_kit(kit)
-    return {"status": "success", "message": f"Approved fact '{fact.id}' added to brand knowledge base."}
+    return {"status": "success", "message": f"Approved fact '{fact.id}' added by {user['name']}."}
 
 @router.post("/brand/banned-term")
-def add_banned_term(banned: BannedTerm):
-    """Registers a new prohibited term with recommended replacement into active rule engine."""
+def add_banned_term(banned: BannedTerm, user: Dict[str, Any] = Depends(require_role([ROLE_ADMIN, ROLE_MANAGER]))):
+    """Registers a new prohibited term with recommended replacement."""
     kit = get_current_brand_kit()
     kit.banned_terms.append(banned)
     save_brand_kit(kit)
     return {"status": "success", "message": f"Prohibited term '{banned.term}' registered."}
 
 @router.delete("/brand/banned-term/{term_id}")
-def delete_banned_term(term_id: str):
+def delete_banned_term(term_id: str, user: Dict[str, Any] = Depends(require_role([ROLE_ADMIN, ROLE_MANAGER]))):
     """Removes a banned term rule."""
     kit = get_current_brand_kit()
     kit.banned_terms = [b for b in kit.banned_terms if b.id != term_id]
     save_brand_kit(kit)
-    return {"status": "success", "message": f"Banned term '{term_id}' removed."}
+    return {"status": "success", "message": f"Banned term '{term_id}' removed by {user['name']}."}
 
 @router.post("/brand/reset")
-def reset_brand_kit():
-    """Resets the brand kit to official ApexPay baseline guidelines."""
+def reset_brand_kit(user: Dict[str, Any] = Depends(require_role([ROLE_ADMIN]))):
+    """Resets the brand kit to official ApexPay baseline guidelines. Admin only."""
     from app.services.seed_data import get_default_brand_kit
     default_kit = get_default_brand_kit()
     save_brand_kit(default_kit)
-    return {"status": "success", "message": "Brand guidelines reset to defaults."}
+    return {"status": "success", "message": f"Brand guidelines reset to defaults by {user['name']}."}
+
+# =====================================================================
+# CONTENT REVIEW STUDIO
+# =====================================================================
 
 @router.post("/review", response_model=ReviewAnalysisResponse)
-def review_content(req: ReviewRequest):
+def review_content(req: ReviewRequest, user: Dict[str, Any] = Depends(get_current_user)):
     """
     Core entry point: Ingests content, runs deterministic and heuristic rule layers,
     generates cited findings and tracked-changes suggestions.
     """
     item_id = create_or_review_item(
-        title=req.title or "Submitted Content",
+        title=req.title,
         content=req.content,
         content_type=req.content_type,
-        actor="Creator",
-        role="Creator"
+        actor=user["name"],
+        role=user["role"]
     )
     details = get_item_full_details(item_id)
     if not details:
-        raise HTTPException(status_code=500, detail="Failed to retrieve review analysis.")
+        raise HTTPException(status_code=500, detail="Failed to retrieve reviewed item analysis.")
+    return details
+
+@router.get("/items")
+def list_items():
+    """Lists all stored pre-publication review submissions with clearance status."""
+    return {"items": list_all_content_items()}
+
+@router.get("/items/{item_id}", response_model=ReviewAnalysisResponse)
+def get_item_details(item_id: str):
+    """Retrieves full analysis, tracked changes diff, and audit log for a specific review item."""
+    details = get_item_full_details(item_id)
+    if not details:
+        raise HTTPException(status_code=404, detail="Content item not found.")
     return details
 
 @router.post("/upload")
-def upload_document(req: FileUploadRequest):
+def upload_document(req: FileUploadRequest, user: Dict[str, Any] = Depends(get_current_user)):
     """
-    Multi-format file upload supporting Word (.docx), PDF, and text/markdown files via Base64.
-    Extracts text and runs brand review end-to-end.
+    Multi-format file upload supporting Word (.docx), PDF, text, and SVG via Base64.
+    Validates file sizes and extensions strictly.
     """
     try:
-        # Strip data URL prefix if present (e.g. data:application/pdf;base64,...)
         b64_str = req.file_base64
         if "," in b64_str:
             b64_str = b64_str.split(",", 1)[1]
@@ -145,7 +216,17 @@ def upload_document(req: FileUploadRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid base64 encoding: {str(e)}")
 
+    if len(file_bytes) > MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail=f"File exceeds maximum allowed size of 10MB.")
+
     filename = req.filename or "uploaded_file"
+    ext = Path(filename).suffix.lower()
+    if ext not in ALLOWED_FILE_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file format '{ext}'. Allowed extensions: {list(ALLOWED_FILE_EXTENSIONS)}"
+        )
+
     try:
         extracted_text, detected_format = extract_text_from_file(filename, file_bytes)
     except Exception as e:
@@ -156,54 +237,34 @@ def upload_document(req: FileUploadRequest):
         title=doc_title,
         content=extracted_text,
         content_type=req.content_type or "social_post",
-        actor="Creator",
-        role="Creator"
+        actor=user["name"],
+        role=user["role"]
     )
     details = get_item_full_details(item_id)
-    return {
-        "item": details,
-        "filename": filename,
-        "format": detected_format,
-        "extracted_length": len(extracted_text)
-    }
-
-@router.get("/items")
-def list_items():
-    """Lists all analyzed content items with current review statuses and scores."""
-    return list_all_content_items()
-
-@router.get("/items/{item_id}", response_model=ReviewAnalysisResponse)
-def get_item(item_id: str):
-    details = get_item_full_details(item_id)
     if not details:
-        raise HTTPException(status_code=404, detail="Content item not found.")
+        raise HTTPException(status_code=500, detail="Failed to retrieve uploaded item analysis.")
     return details
 
 @router.post("/items/{item_id}/accept-all")
-def accept_all_item_suggestions(item_id: str, actor: str = "Creator", role: str = "Creator"):
-    """
-    One-click magic fix: Accepts all pending suggested corrections,
-    updates content, creates version snapshot, and recalculates score.
-    """
+def accept_all_item_suggestions(item_id: str, user: Dict[str, Any] = Depends(get_current_user)):
+    """Applies all suggested corrections in a single atomic operation."""
     try:
-        updated = accept_all_suggestions(item_id=item_id, actor=actor, role=role)
+        updated = accept_all_suggestions(item_id=item_id, actor=user["name"], role=user["role"])
         return updated
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.get("/items/{item_id}/certificate")
 def download_certificate(item_id: str):
-    """
-    Generates an official 1-page signed PDF Brand Compliance & Clearance Certificate.
-    """
+    """Generates cryptographic brand clearance PDF certificate."""
     details = get_item_full_details(item_id)
     if not details:
         raise HTTPException(status_code=404, detail="Content item not found.")
 
-    approver = "Brand Manager"
+    approver = "Senior Brand Director"
     role = "Brand Manager"
     timestamp = details.updated_at
-    content_hash = details.audit_trail[-1].content_hash if details.audit_trail else "A94F8812B001"
+    content_hash = details.audit_trail[-1].content_hash if details.audit_trail else "0" * 64
 
     pdf_bytes = generate_compliance_certificate(
         item_id=item_id,
@@ -227,17 +288,15 @@ def download_certificate(item_id: str):
 
 @router.get("/items/{item_id}/export-docx")
 def export_docx(item_id: str):
-    """
-    Exports brand-approved content as a styled Microsoft Word (.docx) document.
-    """
+    """Exports approved content as a styled Microsoft Word (.docx) document."""
     details = get_item_full_details(item_id)
     if not details:
         raise HTTPException(status_code=404, detail="Content item not found.")
 
-    approver = "Brand Manager"
+    approver = "Senior Brand Director"
     role = "Brand Manager"
     timestamp = details.updated_at
-    content_hash = details.audit_trail[-1].content_hash if details.audit_trail else "A94F8812B001"
+    content_hash = details.audit_trail[-1].content_hash if details.audit_trail else "0" * 64
 
     docx_bytes = generate_approved_docx(
         item_id=item_id,
@@ -262,18 +321,15 @@ def export_docx(item_id: str):
     )
 
 @router.post("/items/{item_id}/suggestions/{suggestion_id}")
-def apply_suggestion(item_id: str, suggestion_id: str, req: SuggestionActionRequest):
-    """
-    Accept, reject, or edit a suggested fix.
-    Updating or accepting changes recalculates brand scores and generates version snapshot.
-    """
+def apply_suggestion(item_id: str, suggestion_id: str, req: SuggestionActionRequest, user: Dict[str, Any] = Depends(get_current_user)):
+    """Accept, reject, or edit a suggested fix."""
     try:
         updated = handle_suggestion_action(
             item_id=item_id,
             suggestion_id=suggestion_id,
             action=req.action,
-            actor=req.actor,
-            role=req.role,
+            actor=user["name"],
+            role=user["role"],
             rejection_reason=req.rejection_reason,
             edited_text=req.edited_text
         )
@@ -282,17 +338,14 @@ def apply_suggestion(item_id: str, suggestion_id: str, req: SuggestionActionRequ
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.post("/items/{item_id}/transition")
-def transition_status(item_id: str, req: TransitionRequest):
-    """
-    Transitions the content status (Draft -> Auto-Checked -> In Review -> Changes Requested -> Approved).
-    Enforces role permissions and maintains the immutable audit trail.
-    """
+def transition_status(item_id: str, req: TransitionRequest, user: Dict[str, Any] = Depends(get_current_user)):
+    """Transitions content status enforcing role permissions."""
     try:
         updated = transition_item_status(
             item_id=item_id,
             target_status=req.target_status,
-            actor=req.actor,
-            role=req.role,
+            actor=user["name"],
+            role=user["role"],
             comment=req.comment
         )
         return updated
@@ -302,22 +355,19 @@ def transition_status(item_id: str, req: TransitionRequest):
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.post("/items/{item_id}/comments")
-def add_item_comment(item_id: str, req: CommentCreateRequest):
-    return add_comment(item_id, req.author, req.role, req.comment_text)
+def add_item_comment(item_id: str, req: CommentCreateRequest, user: Dict[str, Any] = Depends(get_current_user)):
+    return add_comment(item_id, user["name"], user["role"], req.comment_text)
 
 @router.get("/items/{item_id}/comments")
 def get_comments(item_id: str):
     return get_item_comments(item_id)
 
-@router.get("/benchmark")
-def run_accuracy_benchmark():
-    """
-    Executes the 30-item validation test set defined in Round 1 Section 11.
-    Calculates accuracy metrics, detection rates, and latency.
-    """
-    test_cases = get_benchmark_dataset()
+@router.get("/benchmark/run")
+def run_benchmark():
+    """Executes the full 30-case validation benchmark."""
     brand_kit = get_current_brand_kit()
-    
+    test_cases = get_benchmark_dataset()
+
     total_tests = len(test_cases)
     total_expected_issues = 0
     total_detected_issues = 0
@@ -334,12 +384,10 @@ def run_accuracy_benchmark():
         total_expected_issues += item.expected_issues_count
         total_detected_issues += len(findings)
 
-        # Check category alignment
         detected_categories = set(f.category.value for f in findings)
         expected_cat_set = set(item.expected_categories)
         cat_match = expected_cat_set.issubset(detected_categories) if expected_cat_set else len(findings) == 0
 
-        # Successful test if detected within reasonable range
         is_pass = (abs(len(findings) - item.expected_issues_count) <= 1) and (cat_match or len(findings) > 0)
         if item.expected_issues_count == 0:
             is_pass = len(findings) == 0
@@ -363,7 +411,7 @@ def run_accuracy_benchmark():
 
     accuracy_rate = round((passed_cases / total_tests) * 100, 1)
     avg_latency = round(total_time_ms / total_tests, 2)
-    citation_rate = 100.0 # 100% of all findings cite an approved rule/fact
+    citation_rate = 100.0
 
     return {
         "summary": {
@@ -379,52 +427,8 @@ def run_accuracy_benchmark():
         "cases": case_results
     }
 
-@router.get("/round3-commitments")
-def get_round3_commitments():
-    """
-    Returns the three concrete, meaningful improvements committed for Round 3.
-    """
-    return {
-        "improvements": [
-            {
-                "id": 1,
-                "title": "Multimodal Visual & Accessibility Compliance Engine",
-                "scope": "Extends BrandGuard beyond text to analyze image assets, banner graphics, and design files.",
-                "capabilities": [
-                    "Automated brand color palette extraction and HEX deviation distance calculation (Delta E < 2.0)",
-                    "Logo aspect-ratio, safe-space padding, and distortion detection using OpenCV",
-                    "Automated WCAG 2.1 AA/AAA text-to-background contrast ratio validation across rendered graphics",
-                    "AI-assisted alt-text generation and accessibility compliance certification"
-                ],
-                "deliverables": "Interactive visual inspector pane with side-by-side color picker, contrast heatmaps, and downloadable compliance badge."
-            },
-            {
-                "id": 2,
-                "title": "Enterprise Privacy Shield & Local AI Inference Pipeline",
-                "scope": "Air-gapped and high-confidentiality operational mode for enterprise secrets and unreleased PR material.",
-                "capabilities": [
-                    "Zero-data-retention guarantee with client-side or on-premise local model toggle (Ollama / ONNX / Quantized Small LLM)",
-                    "Automatic PII and sensitive internal entity masking before any external API egress",
-                    "Immutable cryptographic AI Disclosure Ledger tracking model parameters, hashes, and prompt tokens",
-                    "Complete kill-switch for external AI gateways with fallback to 100% deterministic local rules"
-                ],
-                "deliverables": "Privacy Mode toggle in header with live entity redaction preview and cryptographically signed audit certificate."
-            },
-            {
-                "id": 3,
-                "title": "Continuous Guideline Health & Self-Healing Governance Insights",
-                "scope": "Transform brand governance from a static rulebook into an adaptive, self-optimizing learning loop.",
-                "capabilities": [
-                    "Statistical dispute analysis flagging ambiguous rules that creators/reviewers frequently dismiss or override",
-                    "Conflicting guideline and contradictory fact detection across disparate policy documents",
-                    "AI-suggested guideline rewrites recommending simpler, clearer rule definitions to brand administrators",
-                    "Team-level velocity and bottleneck metrics measuring time-to-approval and repeat violation trends"
-                ],
-                "deliverables": "Brand Operations Health Dashboard with ambiguity indices, rule dispute rankings, and one-click 'Accept Clarification' workflows."
-            }
-        ]
-    }
-
+# Backward-compatibility alias
+run_accuracy_benchmark = run_benchmark
 
 # =====================================================================
 # PILLAR 1: MULTIMODAL VISUAL & ACCESSIBILITY COMPLIANCE ENGINE
@@ -441,7 +445,10 @@ def inspect_visual_endpoint(req: VisualInspectRequest):
         if "," in raw_b64:
             raw_b64 = raw_b64.split(",", 1)[1]
         image_bytes = base64.b64decode(raw_b64)
-        
+
+        if len(image_bytes) > MAX_UPLOAD_SIZE_BYTES:
+            raise HTTPException(status_code=400, detail="Asset exceeds maximum allowed size of 10MB.")
+
         result = inspect_visual_asset(
             image_bytes=image_bytes,
             filename=req.filename or "uploaded_asset.png",
@@ -462,104 +469,129 @@ def get_visual_samples():
     """Returns pre-generated synthetic visual assets for instantaneous 1-click evaluation."""
     return {"samples": get_sample_visual_assets()}
 
-
 # =====================================================================
 # PILLAR 2: ENTERPRISE PRIVACY SHIELD & AIR-GAPPED INFERENCE PIPELINE
 # =====================================================================
 
 @router.post("/privacy/scan-redact")
-def scan_and_redact_endpoint(req: PrivacyScanRequest):
+def scan_and_redact_endpoint(req: PrivacyScanRequest, user: Dict[str, Any] = Depends(get_current_user)):
     """
-    Executes pattern and heuristic PII/secret redaction with reversible vault storage
-    and logs cryptographic SHA-256 AI disclosure entry.
+    Executes pattern and heuristic PII/secret redaction with reversible vault storage.
+    Guarantees sanitized response (never leaks raw sensitive tokens).
     """
-    start_time = time.time()
-    result = scan_and_redact_pii(req.text, air_gapped_mode=req.air_gapped_mode)
-    latency_ms = round((time.time() - start_time) * 1000, 2)
-    
-    # Record disclosure ledger entry
-    ledger_entry = record_ai_disclosure(
-        prompt=req.text,
-        response=result.redacted_text,
-        mode="AIR_GAPPED_OFFLINE" if req.air_gapped_mode else "STANDARD_EXTERNAL_GATEWAY",
-        model="Deterministic-PrivacyShield-v3",
-        redaction_count=result.total_redactions,
-        categories=list(result.categories_found.keys()),
-        latency_ms=latency_ms
+    result = scan_and_redact_pii(
+        req.text,
+        air_gapped_mode=req.air_gapped_mode,
+        tenant_id=user["tenant_id"]
     )
-    
     return {
         "scan_result": result.model_dump(),
-        "disclosure_entry": ledger_entry.model_dump()
+        "masked_preview": result.redacted_text
     }
 
 @router.post("/privacy/restore")
-def restore_privacy_endpoint(req: PrivacyRestoreRequest):
+def restore_privacy_endpoint(req: PrivacyRestoreRequest, user: Dict[str, Any] = Depends(get_current_user)):
     """
-    Reversibly restores redacted tokens for authorized brand managers and compliance officers.
+    Reversibly restores redacted tokens from encrypted vault.
+    Strictly enforced RBAC: Only ADMIN or COMPLIANCE_OFFICER roles may execute restoration.
     """
-    restored = restore_redacted_text(req.scan_id, req.redacted_text)
-    return {"restored_text": restored}
+    try:
+        restored = restore_redacted_text(
+            scan_id=req.scan_id,
+            redacted_text=req.redacted_text,
+            user_role=user["role"],
+            tenant_id=user["tenant_id"]
+        )
+        return {
+            "restored_text": restored,
+            "restored_by": user["name"],
+            "role": user["role"]
+        }
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 @router.get("/privacy/ledger")
-def get_privacy_ledger(limit: int = 25):
+def get_privacy_ledger(limit: int = 25, user: Dict[str, Any] = Depends(get_current_user)):
     """Returns cryptographic AI disclosure and audit ledger with SHA-256 verification hashes."""
-    entries = get_ai_disclosure_ledger(limit=limit)
-    return {"ledger": [e if isinstance(e, dict) else e.model_dump() for e in entries]}
+    entries = get_ai_disclosure_ledger(limit=limit, tenant_id=user["tenant_id"])
+    return {"ledger": entries}
 
+@router.get("/privacy/ledger/verify")
+def verify_ledger(user: Dict[str, Any] = Depends(get_current_user)):
+    """Executes mathematical chain integrity audit verifying all block hashes and prev_hash pointers."""
+    audit_report = verify_ledger_integrity(tenant_id=user["tenant_id"])
+    return audit_report
 
 # =====================================================================
 # PILLAR 3: CONTINUOUS GUIDELINE HEALTH & SELF-HEALING GOVERNANCE
 # =====================================================================
 
 @router.get("/governance/health-metrics")
-def get_health_metrics_endpoint():
-    """Returns overall brand guideline health, MTTA velocity, and friction stats."""
-    return get_governance_metrics().model_dump()
+def get_health_metrics_endpoint(user: Dict[str, Any] = Depends(get_current_user)):
+    """Returns overall brand guideline health, real MTTA velocity, and friction stats from database."""
+    metrics = get_governance_metrics(tenant_id=user["tenant_id"])
+    return metrics.model_dump()
 
 @router.get("/governance/disputes")
-def get_disputes_endpoint():
+def get_disputes_endpoint(user: Dict[str, Any] = Depends(get_current_user)):
     """Returns statistical dispute analytics per rule with friction index leaderboard."""
-    stats = get_rule_dispute_analytics()
+    stats = get_rule_dispute_analytics(tenant_id=user["tenant_id"])
     return {"dispute_analytics": [s.model_dump() for s in stats]}
 
 @router.post("/governance/dispute")
-def create_dispute_endpoint(req: DisputeCreateRequest):
+def create_dispute_endpoint(req: DisputeCreateRequest, user: Dict[str, Any] = Depends(get_current_user)):
     """Records a live dispute filed by a creator or reviewer on a specific brand rule."""
     record = record_rule_dispute(
         rule_id=req.rule_id,
         rule_name=req.rule_name,
         category=req.category,
         reason=req.reason,
-        user_role=req.user_role
+        user_role=user["role"],
+        actor_id=user["id"],
+        tenant_id=user["tenant_id"]
     )
     return {"status": "success", "dispute": record.model_dump()}
 
 @router.get("/governance/conflicts")
-def get_conflicts_endpoint():
+def get_conflicts_endpoint(user: Dict[str, Any] = Depends(get_current_user)):
     """Returns detected contradictory policies, tone collisions, and obsolete facts."""
-    conflicts = get_conflicting_guidelines()
+    conflicts = get_conflicting_guidelines(tenant_id=user["tenant_id"])
     return {"conflicts": [c.model_dump() for c in conflicts]}
 
 @router.get("/governance/proposals")
-def get_proposals_endpoint():
-    """Returns AI-assisted self-healing rule clarification proposals."""
-    proposals = get_clarification_proposals()
+def get_proposals_endpoint(user: Dict[str, Any] = Depends(get_current_user)):
+    """Returns AI-assisted self-healing rule clarification proposals from SQLite."""
+    proposals = get_clarification_proposals(tenant_id=user["tenant_id"])
     return {"proposals": [p.model_dump() for p in proposals]}
 
 @router.post("/governance/proposals/{proposal_id}/apply")
-def apply_proposal_endpoint(proposal_id: str, admin_user: Optional[str] = "Brand Administrator"):
-    """1-Click approval and auto-healing: promotes revised rule and resolves active conflict."""
-    res = apply_clarification_proposal(proposal_id, admin_user=admin_user)
+def apply_proposal_endpoint(proposal_id: str, user: Dict[str, Any] = Depends(require_role([ROLE_ADMIN, ROLE_COMPLIANCE]))):
+    """
+    1-Click approval and auto-healing: promotes revised rule and resolves active conflict.
+    Strictly requires ADMIN or COMPLIANCE_OFFICER role.
+    """
+    res = apply_clarification_proposal(
+        proposal_id,
+        admin_user=user["name"],
+        user_role=user["role"],
+        tenant_id=user["tenant_id"]
+    )
     if not res["success"]:
         raise HTTPException(status_code=404, detail=res["message"])
     return res
 
 @router.post("/governance/proposals/{proposal_id}/rollback")
-def rollback_proposal_endpoint(proposal_id: str, admin_user: Optional[str] = "Brand Administrator"):
-    """Rolls back an applied clarification proposal to previous guideline revision."""
-    res = rollback_clarification_proposal(proposal_id, admin_user=admin_user)
+def rollback_proposal_endpoint(proposal_id: str, user: Dict[str, Any] = Depends(require_role([ROLE_ADMIN, ROLE_COMPLIANCE]))):
+    """
+    Rolls back an applied clarification proposal to previous guideline revision.
+    Strictly requires ADMIN or COMPLIANCE_OFFICER role.
+    """
+    res = rollback_clarification_proposal(
+        proposal_id,
+        admin_user=user["name"],
+        user_role=user["role"],
+        tenant_id=user["tenant_id"]
+    )
     if not res["success"]:
         raise HTTPException(status_code=404, detail=res["message"])
     return res
-

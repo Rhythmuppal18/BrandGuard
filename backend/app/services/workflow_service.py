@@ -13,7 +13,7 @@ from app.models.schemas import (
 from app.services.rules_engine import analyze_content
 
 def calculate_hash(content: str) -> str:
-    return hashlib.sha256(content.encode('utf-8')).hexdigest()[:12]
+    return hashlib.sha256(content.encode('utf-8')).hexdigest()
 
 def get_current_brand_kit() -> BrandKit:
     conn = get_db()
@@ -326,15 +326,18 @@ def transition_item_status(item_id: str, target_status: StatusEnum, actor: str, 
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
     # Verify authorization
+    authorized_roles = [
+        "Brand Manager", "Legal & Compliance Reviewer", "Brand Admin",
+        "BRAND_MANAGER", "COMPLIANCE_OFFICER", "ADMIN"
+    ]
     if target_status == StatusEnum.APPROVED:
-        # Ensure role is set to authorized sign-off role
-        if role not in ["Brand Manager", "Legal & Compliance Reviewer", "Brand Admin"]:
-            role = "Brand Manager"
-            actor = "Brand Manager"
+        if role not in authorized_roles:
+            conn.close()
+            raise PermissionError(f"Access denied: Role '{role}' is not authorized to grant final brand clearance.")
 
     cursor.execute(
-        "UPDATE content_items SET current_status = ?, updated_at = ? WHERE id = ?",
-        (target_status.value, now, item_id)
+        "UPDATE content_items SET current_status = ?, updated_at = ?, approved_at = ? WHERE id = ?",
+        (target_status.value, now, now if target_status == StatusEnum.APPROVED else None, item_id)
     )
 
     if comment and comment.strip():
