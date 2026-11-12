@@ -471,3 +471,4 @@ def get_governance_metrics() -> GovernanceMetrics:
         total_disputes_recorded=len(_DISPUTES_DB) + 73,
         compliance_velocity_index=94.6
     )
+

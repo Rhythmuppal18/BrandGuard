@@ -59,9 +59,9 @@ router = APIRouter(prefix="/api")
 def health_check():
     return {
         "status": "healthy",
-        "service": "BrandGuard Governance Engine",
-        "version": "2.0.0-round2",
-        "environment": "CodeTitans India 2026 Build"
+        "service": "BrandGuard Enterprise Governance Engine",
+        "version": "3.0.0-final",
+        "environment": "CodeTitans India 2026 Round 3 Finalist"
     }
 
 @router.get("/scenarios")
