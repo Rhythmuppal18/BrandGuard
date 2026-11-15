@@ -753,9 +753,9 @@ function App() {
             <div className="brand-text-col">
               <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
                 <span className="brand-name">BrandGuard</span>
-                <span className="badge-round3-mini">R3 FINAL</span>
+                <span className="badge-round3-mini">ENTERPRISE</span>
               </div>
-              <span className="brand-suite-tag">Enterprise Suite</span>
+              <span className="brand-suite-tag">AI Governance Suite</span>
             </div>
           </div>
 
@@ -764,7 +764,7 @@ function App() {
               <div className="org-dot"></div>
               <span>ApexPay Global</span>
             </div>
-            <span style={{ fontSize: "0.68rem", color: "#38bdf8", fontWeight: 600 }}>Finalist</span>
+            <span style={{ fontSize: "0.68rem", color: "#38bdf8", fontWeight: 600 }}>Active</span>
           </div>
         </div>
 
@@ -954,10 +954,6 @@ function App() {
           </div>
 
           <div className="topbar-right">
-            <span className="badge-round3-pulse">
-              <span className="beacon-indicator"></span>
-              ROUND 3 FINALIST
-            </span>
             <span className="badge badge-neutral" style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>
               Team WHO CARES?
             </span>
@@ -1021,10 +1017,6 @@ function App() {
                       <h1 className="brand-title-main">
                         Executive <span className="brand-title-accent">Command Center</span>
                       </h1>
-                      <span className="badge-round3-pulse">
-                        <span className="beacon-indicator"></span>
-                        ROUND 3 FINALIST
-                      </span>
                     </div>
                     <div className="brand-subtitle-row">
                       <span className="brand-tagline">Unified intelligence across content drafting, visual assets, privacy shielding, and autonomous self-healing</span>
@@ -1279,7 +1271,7 @@ function App() {
           {/* =============================================================== */}
           {activeTab === "studio" && (
             <div>
-              {/* Grand Brand Presentation Header (Round 3 Finalist) */}
+              {/* Grand Brand Presentation Header */}
               <div className="studio-hero-banner">
                 <div className="brand-header-presentation">
                   <BrandGuardLogo size={46} />
@@ -1288,10 +1280,6 @@ function App() {
                       <h1 className="brand-title-main">
                         Brand<span className="brand-title-accent">Guard</span>
                       </h1>
-                      <span className="badge-round3-pulse">
-                        <span className="beacon-indicator"></span>
-                        ROUND 3 FINALIST
-                      </span>
                       <span className="badge-tier-tag">ENTERPRISE SUITE</span>
                     </div>
                     <div className="brand-subtitle-row">
