@@ -183,6 +183,7 @@ function App() {
 
   async function inspectVisualAsset(imageBase64, filename, assetType) {
     setVisualBusy(true);
+    setError("");
     try {
       const res = await fetch(`${API_BASE}/visual/inspect`, {
         method: "POST",
@@ -197,9 +198,13 @@ function App() {
         const data = await res.json();
         setVisualAnalysis(data);
         if (data.overall_visual_score >= 85) triggerConfetti();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.detail || "Failed to inspect visual asset. Ensure file is PNG, JPG, or SVG.");
       }
     } catch (e) {
       console.error(e);
+      setError("Network or server error inspecting visual asset.");
     } finally {
       setVisualBusy(false);
     }
@@ -233,7 +238,11 @@ function App() {
 
   // --- PILLAR 2: PRIVACY SHIELD HANDLERS ---
   async function runPrivacyScan(textToScan, airGapped) {
-    if (!textToScan) return;
+    const txt = textToScan !== undefined ? textToScan : privacyText;
+    if (!txt.trim()) {
+      setError("Please provide text to scan for PII, secrets, and financial tokens.");
+      return;
+    }
     setPrivacyBusy(true);
     setPrivacyRestored(false);
     setError("");
@@ -242,7 +251,7 @@ function App() {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          text: textToScan,
+          text: txt,
           air_gapped_mode: airGapped !== undefined ? airGapped : privacyAirGapped
         })
       });
@@ -251,9 +260,13 @@ function App() {
         setPrivacyResult(data.scan_result);
         fetchPrivacyLedger();
         if (data.scan_result.total_redactions > 0) triggerConfetti();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.detail || "Privacy scan failed.");
       }
     } catch (e) {
       console.error(e);
+      setError("Error executing privacy radar scan.");
     } finally {
       setPrivacyBusy(false);
     }
@@ -402,9 +415,13 @@ function App() {
 
     setBusy(true);
     setError("");
-    try {
-      const reader = new FileReader();
-      reader.onload = async () => {
+    const reader = new FileReader();
+    reader.onerror = () => {
+      setError("Failed to read local file.");
+      setBusy(false);
+    };
+    reader.onload = async () => {
+      try {
         const base64Data = reader.result;
         const res = await fetch(`${API_BASE}/upload`, {
           method: "POST",
@@ -416,23 +433,29 @@ function App() {
             content_type: contentType
           })
         });
-        if (!res.ok) throw new Error("File extraction failed. Ensure file is a valid .docx, .pdf, or text file.");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || "File extraction failed. Ensure file is a valid .docx, .pdf, or text file.");
+        }
         const data = await res.json();
         setTitle(data.item.title);
         setContent(data.item.current_content);
         setReviewResult(data.item);
         if (data.item.brand_score >= 85) triggerConfetti();
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
+      } catch (err) {
+        setError(err.message || "File upload failed.");
+      } finally {
+        setBusy(false);
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   async function runReview() {
-    if (!content.trim()) return;
+    if (!content.trim()) {
+      setError("Please enter or paste marketing copy to review, or select a preloaded scenario.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -445,12 +468,15 @@ function App() {
           content_type: contentType
         })
       });
-      if (!res.ok) throw new Error("Review processing failed.");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || "Review processing failed.");
+      }
       const data = await res.json();
       setReviewResult(data);
       if (data.brand_score >= 85) triggerConfetti();
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Failed to scan copy.");
     } finally {
       setBusy(false);
     }
@@ -954,6 +980,33 @@ function App() {
         </header>
 
         <main className="content-canvas" role="main">
+          {error && (
+            <div style={{
+              background: "var(--danger-bg)",
+              border: "1px solid var(--danger-border)",
+              borderRadius: 8,
+              padding: "0.75rem 1rem",
+              color: "var(--danger-text)",
+              fontSize: "0.85rem",
+              marginBottom: "1.25rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <AlertTriangle size={16} />
+                <span>{error}</span>
+              </div>
+              <button
+                onClick={() => setError("")}
+                style={{ background: "none", border: "none", color: "var(--danger-text)", cursor: "pointer", padding: 4 }}
+                title="Dismiss"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
           {/* =============================================================== */}
           {/* TAB 0: EXECUTIVE OVERVIEW DASHBOARD                             */}
@@ -1010,11 +1063,11 @@ function App() {
                   </div>
                   <div className="kpi-value-row">
                     <span className="kpi-big-num" style={{ color: "var(--info-text)" }}>
-                      {governanceMetrics?.mean_time_to_approval_hours || 3.2}
+                      {governanceMetrics?.mean_time_to_approval_hours ?? 0.01}
                     </span>
                     <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>hours</span>
                   </div>
-                  <div className="kpi-subtext"><strong>↓ 93.3% faster</strong> than legacy 48h manual approval cycles</div>
+                  <div className="kpi-subtext"><strong>↓ {governanceMetrics?.mtta_reduction_pct ?? 100}% faster</strong> than legacy 48h manual approval cycles</div>
                 </div>
 
                 <div className="kpi-stat-card">
@@ -1282,13 +1335,6 @@ function App() {
                   );
                 })}
               </div>
-
-              {error && (
-                <div style={{ background: "var(--danger-bg)", border: "1px solid var(--danger-border)", borderRadius: 8, padding: "0.75rem 1rem", color: "var(--danger-text)", fontSize: "0.82rem", marginBottom: "1rem", display: "flex", alignItems: "center", gap: 8 }}>
-                  <AlertTriangle size={15} />
-                  <span>{error}</span>
-                </div>
-              )}
 
               {/* Main Studio Two-Column Grid */}
               <div className="studio-grid">
@@ -1921,7 +1967,7 @@ function App() {
                     <div style={{ fontSize: "1.6rem", fontWeight: 850, color: "var(--info-text)", marginTop: "0.25rem" }}>
                       {governanceMetrics.mean_time_to_approval_hours} hrs
                     </div>
-                    <span style={{ fontSize: "0.7rem", color: "var(--success-text)" }}>↓ 93.3% MTTA Reduction</span>
+                    <span style={{ fontSize: "0.7rem", color: "var(--success-text)" }}>↓ {governanceMetrics.mtta_reduction_pct ?? 100}% MTTA Reduction</span>
                   </div>
 
                   <div className="card">
